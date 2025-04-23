@@ -28,9 +28,7 @@ jobs:
 
     steps:
       - name: Restart Services
-        run: |
-          docker compose down
-          docker compose up -d --remove-orphans
+        run: docker compose up -d --remove-orphans
 
       - name: Clean up unused images
         run: docker image prune -af
