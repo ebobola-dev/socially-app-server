@@ -118,8 +118,8 @@ async def main():
 		web.get(PATHS.USERS.GET_FOLLOWERS, users_controller.get_followers),
 		web.put(PATHS.USERS.UPDATE_ROLE, users_controller.update_role),
 
-		#web.get(PATHS.TEST_USERS.ADMIN_ROLE_TEST, test_users_controller.test_admin_role),
-		#web.get(PATHS.TEST_USERS.OWNER_ROLE_TEST, test_users_controller.test_owner_role),
+		web.get(PATHS.TEST_USERS.ADMIN_ROLE_TEST, test_users_controller.test_admin_role),
+		web.get(PATHS.TEST_USERS.OWNER_ROLE_TEST, test_users_controller.test_owner_role),
 
 		web.post(PATHS.APK_UPDATES.ADD, apk_updates_controller.add),
 		web.get(PATHS.APK_UPDATES.GET_ONE, apk_updates_controller.get_one),
