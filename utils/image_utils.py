@@ -30,7 +30,3 @@ class ImageUtils:
 		except Exception as error:
 			print(f'error on filetype validation: {error}')
 			return False
-
-	@staticmethod
-	def is_valid(file_bytes: BytesIO) -> bool:
-		return ImageUtils.is_valid_by_pillow(file_bytes) and ImageUtils.is_valid_by_filetype(file_bytes)

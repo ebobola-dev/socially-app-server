@@ -13,15 +13,15 @@ from config.paths import MIDDLEWARE_PATHS, PATHS
 from utils.my_validator.exceptions import MyValidatorError
 
 def _get_access_token_data(authorization_headers):
-		if authorization_headers is None:
-			raise UnauthorizedError()
-		authorization_list = authorization_headers.split(' ')
-		if len(authorization_list) < 2:
-			raise UnauthorizedError()
+	if authorization_headers is None:
+		raise UnauthorizedError()
+	authorization_list = authorization_headers.split(' ')
+	if len(authorization_list) < 2:
+		raise UnauthorizedError()
 
-		access_token = authorization_list[1]
-		data = TokensService.decode_access(access_token)
-		return data
+	access_token = authorization_list[1]
+	data = TokensService.decode_access(access_token)
+	return data
 
 
 def _get_real_ip(request: Request) -> str:

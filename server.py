@@ -66,7 +66,6 @@ async def main():
 			middlewares.admin_role,
 			middlewares.owner_role,
 		),
-		client_max_size = SERVER_CONFIG.MAX_IMAGE_SIZE * 1024 * 1024,
 	)
 	sio.attach(app)
 	main_sio_namespace = SioController(

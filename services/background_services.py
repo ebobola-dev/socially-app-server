@@ -8,7 +8,7 @@ from services.my_logger import MyLogger
 from database.database import Database
 
 class BackgroundServices:
-	CLEANING_OTP_SECONDS_DELAY = 60 * 60 * 6 #? EVERY SIX HOURS
+	CLEANING_OTP_SECONDS_DELAY = 60 * 60 * 6 #? EVERY 6 HOURS
 	CLEANING_REFRESH_TOKEN_SECONDS_DELAY = 60 * 60 * 24 #? EVERY 24 HOURS
 
 	@staticmethod

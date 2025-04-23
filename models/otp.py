@@ -2,7 +2,6 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from sqlalchemy import String, CHAR, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
 from random import randint
 from enum import Enum
 
@@ -26,7 +25,7 @@ class Otp(BaseModel):
 
 	@property
 	def can_update(self):
-		delta = datetime.now() - self.updated_at
+		delta = datetime.now(timezone.utc) - self.updated_at
 		return delta.seconds > 60
 
 	@staticmethod

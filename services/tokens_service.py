@@ -72,4 +72,5 @@ class TokensService:
 		return await RefreshTokenRepository.get_one(session, user_id, device_id)
 
 	@staticmethod
-	async def clean_dead_refresh_tokens(session: AsyncSession): return await RefreshTokenRepository.delete_dead(session)
+	async def clean_dead_refresh_tokens(session: AsyncSession):
+		return await RefreshTokenRepository.delete_dead(session)

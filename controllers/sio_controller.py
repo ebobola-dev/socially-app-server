@@ -35,7 +35,7 @@ class SioController(AsyncNamespace):
 		if not isinstance(session, AuthorizedSioSession):
 			self._logger.info(f"[{sid}] Didn't authorize for a minute, disconnecting...\n")
 			await self.disconnect(sid)
-			self._cancel_wait_authorization(sid)
+		self._cancel_wait_authorization(sid)
 
 	def _cancel_wait_authorization(self, sid):
 		task = self._wait_authorization_tasks.get(sid)
@@ -157,7 +157,7 @@ class SioController(AsyncNamespace):
 
 	@check_authorization
 	async def on_put_app_in_background(self, sid, data = None, session: AuthorizedSioSession = None):
-		self._logger.debug(f'[{sid}] Set user offline\n')
+		self._logger.debug(f'[{sid}] got event (put_app_in_background)\n')
 
 		#* Set user offline
 		async with Database.session_maker() as db_session:
@@ -176,7 +176,7 @@ class SioController(AsyncNamespace):
 
 	@check_authorization
 	async def on_put_app_in_foreground(self, sid, data = None, session: AuthorizedSioSession = None):
-		self._logger.debug(f'[{sid}] Set user online\n')
+		self._logger.debug(f'[{sid}] got event (put_app_in_foreground)\n')
 		await self.emit_user_is_online(session.user_id)
 
 		#* Set user online

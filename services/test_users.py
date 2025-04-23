@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.database import Database
 from models.gender import Gender
-from models.pagination import Pagination
 from models.role import Role
 from models.avatar_type import AvatarType
 from repositories.user_repository import UserRepositorty
@@ -67,8 +66,6 @@ class TestUsers:
 				return False
 
 	async def create_test_users(self) -> None:
-		# all_users = await UserService.get_all(pagination=Pagination(page=1, per_page=20), ignore_incomplete_registration=False)
-		# await asyncio.gather(*( UserService.delete(user.id) for user in all_users ))
 		async with Database.session_maker() as session:
 			try:
 				self._logger.debug(f'Creating test users, reading ({self._test_users_file})...')
