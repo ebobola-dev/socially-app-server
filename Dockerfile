@@ -23,6 +23,6 @@ RUN pip install --no-cache-dir cryptography
 
 EXPOSE ${SERVER_PORT}
 
-RUN chmod +x /wait-for-it.sh /entrypoint.sh
+RUN chmod +x ./wait-for-it.sh ./entrypoint.sh
 
-CMD ["/entrypoint.sh"]
+CMD ["./entrypoint.sh"]
