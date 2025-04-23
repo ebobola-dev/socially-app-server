@@ -5,8 +5,8 @@ from pathlib import Path
 from packaging.version import Version
 
 class FileService:
-	_avatars_dir = 'files/external_avatars'
-	_apks_dir = 'files/apks'
+	_avatars_dir = '/files/external_avatars'
+	_apks_dir = '/files/apks'
 
 	@staticmethod
 	async def _check_avatars_dir():

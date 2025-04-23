@@ -247,7 +247,7 @@ class UsersController:
 			raise ValidationError('Target user does not have an external avatar')
 		avatar_file_path = await FileService.get_avatar_filepath(user_id)
 		if avatar_file_path is None:
-			self._logger.warning(f'Unable to find avatar file path for @{target_user}, but its exists in database')
+			self._logger.warning(f'Unable to find avatar file path for @{target_user.username}, but its exists in database')
 			raise ValidationError('Target user does not have an external avatar')
 		return FileResponse(avatar_file_path)
 
