@@ -5,8 +5,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test Docker Build
+  build:
+    name: Docker Build
     runs-on: self-hosted
 
     steps:
@@ -18,26 +18,15 @@ jobs:
         - name: Copy env file
           run: cp ~/envs/socially_app.env .env
 
-        - name: Test Docker Compose build
+        - name: Docker Compose build
           run: docker compose build
 
   deploy:
-    name: Deploy to self-hosted server
+    name: Deploy to Server
     runs-on: self-hosted
-    needs: test
+    needs: [build]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          clean: false
-
-      - name: Copy env file
-        run: cp ~/envs/socially_app.env .env
-
-      - name: Build docker images
-        run: docker compose build
-
       - name: Restart Services
         run: |
           docker compose down
