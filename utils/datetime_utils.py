@@ -1,6 +1,9 @@
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
 class DateTimeUtils:
+	MOSCOW_ZONE = ZoneInfo("Europe/Moscow")
+
 	@staticmethod
 	def is_valid_iso_string_date(value: str):
 		try:

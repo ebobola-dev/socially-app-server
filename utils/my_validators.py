@@ -8,7 +8,7 @@ from models.avatar_type import AvatarType
 from models.role import Role
 from config.length_requirements import LENGTH_REQIREMENTS
 from config.re_patterns import RE_PATTERNS
-from utils.datetime_utls import DateTimeUtils
+from utils.datetime_utils import DateTimeUtils
 
 class Validate:
 	def email(email):

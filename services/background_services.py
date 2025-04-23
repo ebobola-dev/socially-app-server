@@ -1,11 +1,12 @@
 import asyncio
 from aiohttp.web import Application
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from repositories.otp_repository import OtpRepository
 from services.tokens_service import TokensService
 from services.my_logger import MyLogger
 from database.database import Database
+from utils.datetime_utils import DateTimeUtils
 
 class BackgroundServices:
 	CLEANING_OTP_SECONDS_DELAY = 60 * 60 * 6 #? EVERY 6 HOURS
@@ -38,8 +39,8 @@ class BackgroundServices:
 					await session.rollback()
 					logger.error(f'Error on cleaing OTP codes: {error}')
 				finally:
-					again_start_time = (datetime.now() + timedelta(seconds=delay)).strftime('%H:%M:%S')
-					logger.info(f'OTP cleaning will be started again at {again_start_time} (UTC)\n')
+					again_start_time = (datetime.now(timezone.utc).astimezone(DateTimeUtils.MOSCOW_ZONE) + timedelta(seconds=delay)).strftime('%H:%M:%S')
+					logger.info(f'OTP cleaning will be started again at {again_start_time}\n')
 					try:
 						await asyncio.sleep(delay)
 					except asyncio.CancelledError:
@@ -60,8 +61,8 @@ class BackgroundServices:
 					await session.rollback()
 					logger.error(f'Error on cleaing refresh tokens: {error}')
 				finally:
-					again_start_time = (datetime.now() + timedelta(seconds=delay)).strftime('%d.%m %H:%M:%S')
-					logger.info(f'Refresh token cleaning will be started again on {again_start_time} (UTC)\n')
+					again_start_time = (datetime.now(timezone.utc).astimezone(DateTimeUtils.MOSCOW_ZONE) + timedelta(seconds=delay)).strftime('%d.%m %H:%M:%S')
+					logger.info(f'Refresh token cleaning will be started again on {again_start_time}\n')
 					try:
 						await asyncio.sleep(delay)
 					except asyncio.CancelledError:

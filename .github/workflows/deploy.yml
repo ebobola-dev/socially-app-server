@@ -1,0 +1,23 @@
+name: Deploy on Server
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy to self-hosted server
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy env file
+        run: cp ~/envs/socially_app.env .env
+
+      - name: Set up Docker Compose
+        run: |
+          docker compose down
+          docker compose pull
+          docker compose up -d --build --remove-orphans
