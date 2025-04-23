@@ -23,4 +23,6 @@ RUN pip install --no-cache-dir cryptography
 
 EXPOSE ${SERVER_PORT}
 
-CMD [ "python", "server.py" ]
+RUN chmod +x /wait-for-it.sh /entrypoint.sh
+
+CMD ["/entrypoint.sh"]

@@ -8,6 +8,7 @@
 
 .env
 test.py
+entrypoint.dev.sh
 
 dev.py
 Dockerfile.dev
