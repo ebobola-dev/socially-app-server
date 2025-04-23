@@ -11,7 +11,6 @@ from config.paths import PATHS
 from config.logger_config import MY_LOGGER_CONFIG
 
 from database.database import Database
-
 from controllers.middlewares import Middlewares
 from controllers.registration_controller import RegistrationController
 from controllers.auth_conrtoller import AuthConrtoller
