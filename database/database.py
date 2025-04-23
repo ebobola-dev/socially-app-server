@@ -38,7 +38,8 @@ class Database:
 			await connection.commit()
 		await engine_wo_db.dispose()
 		return create_async_engine(
-			f'mysql+asyncmy://{DATABASE_CONFIG.USER}:{DATABASE_CONFIG.PASSWORD}@{DATABASE_CONFIG.HOST}:{DATABASE_CONFIG.PORT}/{DATABASE_CONFIG.NAME}'
+			f'mysql+asyncmy://{DATABASE_CONFIG.USER}:{DATABASE_CONFIG.PASSWORD}@{DATABASE_CONFIG.HOST}:{DATABASE_CONFIG.PORT}/{DATABASE_CONFIG.NAME}',
+			pool_pre_ping=True,
 		)
 
 	@staticmethod
@@ -57,7 +58,7 @@ class Database:
 			raise DatabaseNotInitialized()
 		async with Database.session_maker() as session:
 			try:
-				rowcount = await UserRepositorty.reset_sids(session)
+				await UserRepositorty.reset_sids(session)
 				await session.commit()
 			except Exception as error:
 				await session.rollback()

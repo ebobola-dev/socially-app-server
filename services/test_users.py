@@ -26,7 +26,10 @@ class TestUsers:
 		return email, bool(user)
 
 	async def _get_non_existent_users(self, session: AsyncSession, emails: Iterable[str]) -> tuple[str]:
-		result = await asyncio.gather(*[ self._check_user_exist(session, email) for email in emails ])
+		result = []
+		for email in emails:
+			check_res = await self._check_user_exist(session, email)
+			result.append(check_res)
 		non_existent_emails = tuple(email for email, is_exist in result if not is_exist)
 		return non_existent_emails
 
@@ -66,13 +69,13 @@ class TestUsers:
 				return False
 
 	async def create_test_users(self) -> None:
-		async with Database.session_maker() as session:
 			try:
 				self._logger.debug(f'Creating test users, reading ({self._test_users_file})...')
 				test_users_data = self._get_test_users_data()
 				count = len(test_users_data)
 				self._logger.debug(f'Got ({count}) users from json file, checking exists')
-				non_existent_emails = await self._get_non_existent_users(session, (json_user.get('email_address') for json_user in test_users_data))
+				async with Database.session_maker() as session:
+					non_existent_emails = await self._get_non_existent_users(session, (json_user.get('email_address') for json_user in test_users_data))
 				if not non_existent_emails:
 					self._logger.info(f'No non-existing test users were found (by {count} emails)\n')
 					return
@@ -80,7 +83,10 @@ class TestUsers:
 				non_existent_users_data = tuple(
 					test_user_data for test_user_data in test_users_data if test_user_data.get('email_address') in non_existent_emails
 				)
-				creation_result = await asyncio.gather(*[ self._create_test_user(user_data) for user_data in non_existent_users_data ])
+				creation_result = []
+				for user_data in non_existent_users_data:
+					one_creation_result = await self._create_test_user(user_data)
+					creation_result.append(one_creation_result)
 				self._logger.info(f'Created ({creation_result.count(True)}) test users\n')
 			except Exception as error:
 				self._logger.warning(f'Error on creating test users: {error}\n')
