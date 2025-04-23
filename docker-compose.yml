@@ -11,8 +11,8 @@ services:
       MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD}
       LOGGING_LEVEL: INFO
     volumes:
-      - ./files/external_avatars:/files/external_avatars
-      - ./files/apks:/files/apks
+      - /home/ebobola/data/socially_app/external_avatars:/files/external_avatars
+      - /home/ebobola/data/socially_app/apks:/files/apks
     expose:
       - "${SERVER_PORT}"
     depends_on:
