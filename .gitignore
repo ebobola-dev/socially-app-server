@@ -1,0 +1,14 @@
+**/__pycache__/
+/.vscode
+/.venv
+/testing
+/files
+/draw-io-diagram
+/logs
+
+.env
+test.py
+
+dev.py
+Dockerfile.dev
+docker-compose.override.yml

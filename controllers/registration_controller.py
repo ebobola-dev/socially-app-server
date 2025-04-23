@@ -1,0 +1,176 @@
+from logging import Logger
+from datetime import date
+from aiohttp.web import Request, json_response
+
+from models.gender import Gender
+from models.otp import OtpDestiny
+from models.exceptions.api_exceptions import *
+from models.role import Role
+
+from utils.my_validators import Validate
+from services.email_service import EmailService
+from services.tokens_service import TokensService
+from repositories.otp_repository import OtpRepository
+from repositories.user_repository import UserRepositorty
+
+class RegistrationController:
+	def __init__(self, logger: Logger):
+		self._logger = logger
+
+	async def check_email(self, request: Request):
+		body = await request.json()
+		email = body.get('email')
+
+		email_is_valid, valid_error = Validate.email(email)
+		if not email_is_valid:
+			raise ValidationError(valid_error)
+
+		#* Checking for spam to OTP generation
+		if not (await OtpRepository.can_update(request.db_session, email)):
+			raise SpamError(
+				server_message=f'Got spam ({email})',
+				response_message = 'Wait a minute before resend the OTP code',
+			)
+
+		#* Check user exists
+		user = await UserRepositorty.get_by_email(request.db_session, email)
+		if user is not None and user.is_registration_completed:
+			raise UserWithEmailHasAlreadyCompletedRegistration(email_address=email)
+
+		#* Creating and saving OTP
+		otp = await OtpRepository.create_or_update(request.db_session, email)
+		self._logger.info(f'{email} OTP generated: {otp.value}')
+
+		#* Sending OTP to email address
+		try:
+			await EmailService.send_otp(email, otp.value, OtpDestiny.registration)
+		except Exception as email_error:
+			raise CouldNotSendOtpToEmail(email, email_error)
+
+		return json_response(data = otp.to_json(safe=True))
+
+	async def check_otp(self, request: Request):
+		body = await request.json()
+		email = body.get('email')
+
+		email_is_valid, valid_error = Validate.email(email)
+		if not email_is_valid:
+			raise ValidationError(valid_error)
+
+		#* Check user with registration completed
+		user = await UserRepositorty.get_by_email(request.db_session, email)
+		if user is not None and user.is_registration_completed:
+			raise UserWithEmailHasAlreadyCompletedRegistration(email_address=email)
+
+		otp_code = body.get('otp_code')
+		otp_code_is_valid, valid_error = Validate.otp_code(otp_code)
+		if not otp_code_is_valid:
+			raise ValidationError(valid_error)
+
+		await OtpRepository.verify(request.db_session, email, otp_code)
+
+		self._logger.debug(f'{email} verified OTP code')
+
+		owner_key = body.get('owner_key')
+
+		if user is None:
+			new_user_role = Role.user
+			if owner_key and SERVER_CONFIG.OWNER_KEY and SERVER_CONFIG.OWNER_KEY == owner_key:
+				new_user_role = Role.owner
+				self._logger.warning(f'OWNER user has registered, email: {email}')
+			user = await UserRepositorty.create_new(request.db_session, email, new_user_role)
+		else:
+			if user.role != Role.owner:
+				if owner_key and SERVER_CONFIG.OWNER_KEY and SERVER_CONFIG.OWNER_KEY == owner_key:
+					user = await UserRepositorty.update_role(
+						request.db_session,
+						target_id = user.id,
+						new_role = Role.owner,
+					)
+					self._logger.warning(f'OWNER user has registered(role updated), email: {email}')
+
+		access_token, refresh_token = await TokensService.generate_pair_and_save_refresh(
+			session = request.db_session,
+			user_id = user.id,
+			device_id = request.device_id,
+			user_role = user.role,
+		)
+
+		return json_response({
+			'access_token': access_token,
+			'refresh_token': refresh_token,
+			'user_id': user.id,
+			'user_role': user.role.value,
+		})
+
+	async def complete_registration(self, request: Request):
+		body = await request.json()
+
+		fullname = body.get('fullname')
+		date_of_birth = body.get('date_of_birth')
+		gender = body.get('gender')
+		about_me = body.get('about_me')
+		username = body.get('username')
+		password = body.get('password')
+
+		#* ---------------------------------------------- Validations ----------------------------------------------
+		#? Fullname (Not reqiured)
+		fullname_is_valid, valid_error = Validate.fullname(fullname)
+		if not fullname_is_valid:
+			raise ValidationError(valid_error)
+
+		#? Date of birth (Reqiured)
+		date_of_birth_is_valid, valid_error = Validate.date_of_birth(date_of_birth)
+		if not date_of_birth_is_valid:
+			raise ValidationError(valid_error)
+		date_of_birth = date.fromisoformat(date_of_birth)
+
+		#? Gender (Not Reqiured)
+		gender_is_valid, valid_error = Validate.gender(gender)
+		if not gender_is_valid:
+			raise ValidationError(valid_error)
+		if gender is not None:
+			gender = Gender(gender)
+
+		#? About me (Not required)
+		about_me_is_valid, valid_error = Validate.about_me(about_me)
+		if not about_me_is_valid:
+			raise ValidationError(valid_error)
+
+		#? Username (Required)
+		username_is_valid, valid_error = Validate.username(username)
+		if not username_is_valid:
+			raise ValidationError(valid_error)
+
+		#? Password (Required)
+		password_is_valid, valid_error = Validate.password(password)
+		if not password_is_valid:
+			raise ValidationError(valid_error)
+		#* -------------------------------------------- End Validations --------------------------------------------
+
+		#* Find the user by id
+		user_id = request.user_id
+
+		user = await UserRepositorty.get_by_id(request.db_session, user_id)
+		if user is None:
+			raise CouldNotFoundUserWithId(user_id)
+		if user is not None and user.is_registration_completed:
+			raise UserWithEmailHasAlreadyCompletedRegistration(user.email_address)
+
+		#* Check username is unique
+		if (await UserRepositorty.get_by_username(request.db_session, username) is not None):
+			raise UsernameIsAlreadyTaken(username)
+
+		#* Completing registration
+		updated_user = await UserRepositorty.complete_registration(
+			session = request.db_session,
+			user_id = user_id,
+			fullname = fullname,
+			gender = gender,
+			date_of_birth = date_of_birth,
+			about_me = about_me,
+			username = username,
+			password = password,
+		)
+		self._logger.debug(f'{user.email_address} completed the registration')
+		return json_response(data = updated_user.to_json(safe=True))

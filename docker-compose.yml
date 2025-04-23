@@ -1,0 +1,58 @@
+services:
+  server:
+    build: .
+    env_file: .env
+    container_name: 'server'
+    environment:
+      RUN_IN_DOCKER: true
+      TZ: UTC
+      MYSQL_HOST: db
+      MYSQL_USER: ${DOCKER_MYSQL_USER}
+      MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD}
+      LOGGING_LEVEL: INFO
+    volumes:
+      - ./files/external_avatars:/files/external_avatars
+      - ./files/apks:/files/apks
+    expose:
+      - "${SERVER_PORT}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27
+    container_name: 'nginx'
+    build:
+      context: ./nginx
+    env_file: .env
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+    ports:
+      - "${NGINX_EXTERNAL_PORT}:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: 'database'
+    environment:
+      TZ: UTC
+      MYSQL_DATABASE: ${MYSQL_NAME}
+      MYSQL_USER: ${DOCKER_MYSQL_USER}
+      MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${DOCKER_MYSQL_PORT}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  db_data:
