@@ -25,7 +25,7 @@ class Otp(BaseModel):
 
 	@property
 	def can_update(self):
-		delta = datetime.now(timezone.utc) - self.updated_at
+		delta = datetime.now() - self.updated_at
 		return delta.seconds > 60
 
 	@staticmethod
