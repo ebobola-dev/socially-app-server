@@ -43,8 +43,6 @@ services:
       MYSQL_USER: ${DOCKER_MYSQL_USER}
       MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD}
-    ports:
-      - "${DOCKER_MYSQL_PORT}:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
