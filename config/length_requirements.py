@@ -7,7 +7,7 @@ class LENGTH_REQIREMENTS:
 	class USERNAME:
 		MIN = 4
 		MAX = 16
-		TEXT = f'lowercase latin, number, underscore and dots only, between {MIN} and {MAX} chracters, must not start with a dot'
+		TEXT = f'lowercase latin, number, underscore and dots only, between {MIN} and {MAX} chracters, cannot start with a dot or a number, cannot consist of only numbers'
 
 	class PASSWORD:
 		MIN = 8
