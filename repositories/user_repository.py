@@ -160,9 +160,9 @@ class UserRepositorty:
 		if not target:
 			raise CouldNotFoundUserWithId(target_id)
 		if target in await subscriber.awaitable_attrs.following:
-			raise ResetContent(
-				server_message = 'Already following the target user',
-				response_message = 'You are already following the target user',
+			raise AlreadyFollowing(
+				sub_username=subscriber.username,
+				target_username=target.username,
 			)
 		subscriber.following.append(target)
 		try:
@@ -186,9 +186,9 @@ class UserRepositorty:
 		if not target:
 			raise CouldNotFoundUserWithId(target_id)
 		if target not in await subscriber.awaitable_attrs.following:
-			raise ResetContent(
-				server_message = 'Is not following the target user anyway',
-				response_message = 'You are not following the target user anyway',
+			raise NotFollowingAnyway(
+				sub_username=subscriber.username,
+				target_username=target.username,
 			)
 		subscriber.following.remove(target)
 		try:
@@ -321,7 +321,7 @@ class UserRepositorty:
 			if key in User.allowed_to_update_fields
 		}
 		if not new_data:
-			raise NotModified(
+			raise NothingToUpdate(
 				server_message = f'nothing to update, {update_data} -> {new_data}',
 			)
 		user: User = await session.get(User, user_id)

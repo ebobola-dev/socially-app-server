@@ -15,6 +15,7 @@ class ApkUpdate(BaseModel):
 	description: Mapped[String] = mapped_column(String(512), nullable=False)
 	uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 	file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+	sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
 	def __repr__(self):
 		return f'<ApkUpdate>({self.version} ({SizeUtils.bytes_to_human_readable(self.file_size)}), uploaded_at: {self.uploaded_at})'

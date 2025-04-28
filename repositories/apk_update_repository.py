@@ -31,7 +31,7 @@ class ApkUpdateRepository:
 	@staticmethod
 	async def get(session: AsyncSession, min_version: VersionType | None = None) -> list[ApkUpdate]:
 		if min_version:
-			query = select(ApkUpdate).where(ApkUpdate.version > min_version).order_by(ApkUpdate.version.desc())
+			query = select(ApkUpdate).where(ApkUpdate.version >= min_version).order_by(ApkUpdate.version.desc())
 		else:
 			query = select(ApkUpdate)
 		result = await session.scalars(query)

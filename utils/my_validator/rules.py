@@ -1,19 +1,24 @@
-from re import fullmatch
+from re import fullmatch, search
 from datetime import date, datetime
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Union
 from enum import Enum
 
 from models.otp import Otp
-from utils.my_validator.exceptions import *
+from utils.my_validator.exceptions import BadInitializeData
 
 T = TypeVar('T')
+
+class RuleError(Exception):
+	def __init__(self, error):
+		super().__init__(error)
+		self.error_message = error
 
 class ValidateRule(ABC):
 	@abstractmethod
 	def __call__(self, value: any) -> any:
 		if value is None:
-			raise MyValidatorError(["don't call Rule if value is None"])
+			raise RuleError("don't call Rule if value is None")
 
 class LengthRule(ValidateRule):
 	def __init__(
@@ -36,11 +41,11 @@ class LengthRule(ValidateRule):
 	def __call__(self, value):
 		super().__call__(value)
 		if len(value) < self.min_length:
-			raise MyValidatorError([self.error_description])
+			raise RuleError(self.error_description)
 		if self.max_length is not None and len(value) > self.max_length:
-			raise MyValidatorError([self.error_description])
+			raise RuleError(self.error_description)
 
-class RePatternRule(ValidateRule):
+class ReFullmatchPatternRule(ValidateRule):
 	def __init__(self, re_pattern, error_description: str = 'invalid_value'):
 		super().__init__()
 		self.re_pattern = re_pattern
@@ -49,7 +54,17 @@ class RePatternRule(ValidateRule):
 	def __call__(self, value):
 		super().__call__(value)
 		if not fullmatch(self.re_pattern, value):
-			raise MyValidatorError([self.error_description])
+			raise RuleError(self.error_description)
+class ReSearchPatternRule(ValidateRule):
+	def __init__(self, re_pattern, error_description: str = 'invalid_value'):
+		super().__init__()
+		self.re_pattern = re_pattern
+		self.error_description = error_description
+
+	def __call__(self, value):
+		super().__call__(value)
+		if not search(self.re_pattern, value):
+			raise RuleError(self.error_description)
 
 class OtpRule(ValidateRule):
 	def __init__(self):
@@ -58,7 +73,7 @@ class OtpRule(ValidateRule):
 	def __call__(self, value):
 		super().__call__(value)
 		if not Otp.is_valid_value(value):
-			raise MyValidatorError(['Invalid OTP'])
+			raise RuleError('Invalid OTP')
 
 class DateIsoRule(ValidateRule):
 	def __init__(self):
@@ -69,7 +84,7 @@ class DateIsoRule(ValidateRule):
 		try:
 			date.fromisoformat(value)
 		except:
-			raise MyValidatorError(['bad iso date'])
+			raise RuleError('bad iso date')
 
 class DateTimeIsoRule(ValidateRule):
 	def __init__(self):
@@ -80,7 +95,7 @@ class DateTimeIsoRule(ValidateRule):
 		try:
 			datetime.fromisoformat(value)
 		except:
-			raise MyValidatorError(['bad iso date'])
+			raise RuleError('bad iso datetime')
 
 class EnumRule(ValidateRule):
 	def __init__(self, enum: Type[T]) -> T:
@@ -101,15 +116,15 @@ class EnumRule(ValidateRule):
 		super().__call__(value)
 		def check_int(int_value: int):
 			if not int_value in self.enum_values:
-				raise MyValidatorError([self.error_text])
+				raise RuleError(self.error_text)
 		temp_value = value
 		if not isinstance(temp_value, int | str):
-			raise MyValidatorError([self.error_text])
+			raise RuleError(self.error_text)
 		if isinstance(temp_value, int):
 			check_int(temp_value)
 			return self.enum(temp_value)
 		if isinstance(temp_value, str) and not temp_value.isdigit():
-			raise MyValidatorError([self.error_text])
+			raise RuleError(self.error_text)
 		temp_value = int(temp_value)
 		check_int(temp_value)
 		return self.enum(temp_value)
@@ -126,4 +141,19 @@ class CanCreateInstanceRule(ValidateRule):
 		try:
 			self.cls_type(value)
 		except:
-			raise MyValidatorError([f"bad value for {self.cls_type.__name__}"])
+			raise RuleError(f"bad value for {self.cls_type.__name__}")
+
+class IsInstanceRule(ValidateRule):
+	def __init__(self, *types: Type):
+		if not types:
+			raise BadInitializeData("At least one type must be specified")
+		if not all(isinstance(t, type) for t in types):
+			raise BadInitializeData("All arguments must be types")
+		self.types = types
+		self.type_names = ", ".join(t.__name__ for t in types)
+		super().__init__()
+
+	def __call__(self, value):
+		super().__call__(value)
+		if not isinstance(value, self.types):
+			raise RuleError(f"Value must be instance of: {self.type_names}")

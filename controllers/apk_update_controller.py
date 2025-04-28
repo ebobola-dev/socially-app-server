@@ -1,18 +1,19 @@
+import asyncio
 from logging import Logger
 from aiohttp.web import Request, json_response, FileResponse
 from packaging.version import Version
 from io import BytesIO
 from re import fullmatch
 
-from utils.my_validators import Validate
 from models.exceptions.api_exceptions import *
 from controllers.sio_controller import SioController
 from repositories.apk_update_repository import ApkUpdateRepository
 from models.apk_update import ApkUpdate
 from services.file_service import FileService
-from datetime import datetime, timezone
 from config.re_patterns import RE_PATTERNS
 from utils.sizes import SizeUtils
+from utils.file_utils import FileUtils
+from utils.my_validator.my_validator import ValidateField
 
 class ApkUpdatesController:
 	def __init__(self, logger: Logger, main_sio_namespace: SioController):
@@ -21,15 +22,9 @@ class ApkUpdatesController:
 
 	async def get_one(self, request: Request):
 		version = request.match_info.get('update_id')
-
-		version_is_valid, valid_error = Validate.version(version)
-		if not version_is_valid:
-			raise ValidationError(valid_error)
-
+		ValidateField.version()(version)
 		version = Version(version)
 
-		self._logger.debug(f'datetime now = {datetime.now()}')
-		self._logger.debug(f'datetime now with utc timezone = {datetime.now(tz=timezone.utc)}')
 		saved_apk_update = await ApkUpdateRepository.get_by_version(
 			session = request.db_session,
 			version = version,
@@ -42,7 +37,7 @@ class ApkUpdatesController:
 		)
 		if not latest_apk_updates:
 			return json_response(data=saved_apk_update.to_json())
-		all_descriptions = tuple(map(lambda apk_update: apk_update.description, latest_apk_updates))
+		all_descriptions = tuple(map(lambda apk_update: apk_update.description, latest_apk_updates[0:len(latest_apk_updates) - 1]))
 		return json_response(data=latest_apk_updates[0].to_json(
 			replace_descriptions = all_descriptions,
 		))
@@ -51,9 +46,7 @@ class ApkUpdatesController:
 	async def get_many(self, request: Request):
 		min_version = request.query.get('min_version', None)
 		if min_version:
-			version_is_valid, valid_error = Validate.version(min_version)
-			if not version_is_valid:
-				raise ValidationError(valid_error)
+			ValidateField.version(field_name='min_version')(min_version)
 			min_version = Version(min_version)
 		apk_updates = await ApkUpdateRepository.get(
 			session = request.db_session,
@@ -79,10 +72,14 @@ class ApkUpdatesController:
 				case 'apk':
 					apk_filename = part.filename
 					if apk_filename is None or apk_filename == '':
-						raise ValidationError('Field [apk] is not a file')
+						raise ValidationError({
+							'apk': 'must be specified, must be a file'
+						})
 					match = fullmatch(RE_PATTERNS.APK_UPDATE_FILE, apk_filename)
 					if not match:
-						raise ValidationError('Bad apk filename')
+						raise ValidationError({
+							'apk': 'bad filename',
+						})
 					version = match.group('version')
 					apk_file_buffer = BytesIO()
 					while chunk := await part.read_chunk(4096):
@@ -93,16 +90,20 @@ class ApkUpdatesController:
 					try:
 						description = (await part.text()).strip()
 					except:
-						raise ValidationError('Field [description] must be a string')
+						raise ValidationError({
+							'description': 'must be a string',
+						})
 
 		if not apk_file_buffer:
-			raise ValidationError('apk file must be specified')
+			raise ValidationError({
+				'apk': 'must be specified, must be a file',
+			})
 		if not description:
-			raise ValidationError('description must be specified')
+			raise ValidationError({
+				'description': 'must be specified, must be a string',
+			})
 
-		version_is_valid, valid_error = Validate.version(version)
-		if not version_is_valid:
-			raise ValidationError(valid_error)
+		ValidateField.version()(version)
 		version = Version(version)
 		self._logger.debug(f'Got new "{apk_filename}", version: {version}, size: {SizeUtils.bytes_to_human_readable(size)}\n')
 		saved_apk_update = await ApkUpdateRepository.get_by_version(
@@ -111,10 +112,12 @@ class ApkUpdatesController:
 		)
 		if saved_apk_update:
 			raise ApkUpdateWithVersionAlreadyExists(version)
+		sha256_hash = await asyncio.to_thread(lambda: FileUtils.calculate_sha256_from_bytesio(apk_file_buffer))
 		new_apk_update = ApkUpdate(
 			version = version,
 			description = description,
 			file_size = size,
+			sha256_hash = sha256_hash,
 		)
 		new_apk_update = await ApkUpdateRepository.create_new(
 			session = request.db_session,
@@ -131,9 +134,7 @@ class ApkUpdatesController:
 
 	async def delete(self, request: Request):
 		version = request.query.get('version')
-		version_is_valid, valid_error = Validate.version(version)
-		if not version_is_valid:
-			raise ValidationError(valid_error)
+		ValidateField.version()(version)
 		version = Version(version)
 		await FileService.delete_apk_update_file(version=version)
 		deleted_count = await ApkUpdateRepository.delete_by_version(
@@ -147,9 +148,7 @@ class ApkUpdatesController:
 
 	async def download(self, request: Request):
 		version = request.query.get('version')
-		version_is_valid, valid_error = Validate.version(version)
-		if not version_is_valid:
-			raise ValidationError(valid_error)
+		ValidateField.version()(version)
 		version = Version(version)
 		if not (await ApkUpdateRepository.get_by_version(
 			session = request.db_session,

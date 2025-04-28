@@ -5,7 +5,6 @@ from aiohttp.web_exceptions import HTTPError
 
 from models.role import Role
 from models.exceptions.api_exceptions import *
-from utils.my_validators import Validate
 from services.tokens_service import TokensService
 from repositories.user_repository import UserRepositorty
 from database.database import Database
@@ -46,16 +45,19 @@ class Middlewares:
 			return result
 		except ApiError as api_error:
 			handle_time = time() - start_time
-			self._logger.error(f'[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] [{type(api_error).__name__}] {api_error.server_message}\n')
+			self._logger.error(f'[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n')
 			return json_response(
 				status = api_error.response_status_code,
 				data = api_error.to_json(),
 			)
 		except MyValidatorError as my_validator_error:
 			handle_time = time() - start_time
-			#TODO remake
-			api_error = ValidationError(my_validator_error.errors[0])
-			self._logger.error(f'[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] [{type(api_error).__name__}] {api_error.server_message}\n')
+			api_error = ValidationError(
+				field_specific_erros={
+					my_validator_error.field_name: my_validator_error.errors,
+				}
+			)
+			self._logger.error(f'[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n')
 			return json_response(
 				status = api_error.response_status_code,
 				data = api_error.to_json(),
@@ -64,7 +66,7 @@ class Middlewares:
 			status_code = 500
 			if hasattr(http_error, 'status_code'):
 				status_code = http_error.status_code
-			self._logger.error(f'[{request.path} -> {status_code}] {http_error}\n')
+			self._logger.error(f'[{request.path} -> {status_code}] {type(http_error).__name__} {http_error}\n')
 			return Response(status=status_code)
 		except Exception as unexcepted_error:
 			handle_time = time() - start_time
@@ -79,9 +81,8 @@ class Middlewares:
 	async def check_device_id(self, request: Request, handler):
 		if request.path.startswith(MIDDLEWARE_PATHS.DEVICE_ID_SPECIFIED):
 			device_id = request.headers.get('device_id')
-			device_id_is_valid, valid_error = Validate.device_id(device_id)
-			if not device_id_is_valid:
-				raise BadDeviceID(valid_error)
+			if not isinstance(device_id, str) or not device_id:
+				raise BadDeviceID()
 			request.device_id = device_id
 		return await handler(request)
 

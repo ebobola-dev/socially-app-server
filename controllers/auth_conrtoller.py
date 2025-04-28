@@ -7,7 +7,7 @@ from repositories.user_repository import UserRepositorty
 from repositories.otp_repository import OtpRepository
 from models.otp import OtpDestiny
 from models.exceptions.api_exceptions import *
-from utils.my_validators import Validate
+from utils.my_validator.my_validator import validate_request_body, ValidateField
 from services.email_service import EmailService
 from controllers.sio_controller import SioController
 
@@ -16,19 +16,15 @@ class AuthConrtoller:
 		self._logger = logger
 		self._sio = main_sio_namespace
 
+	@validate_request_body(
+		ValidateField.username(),
+		ValidateField.password(),
+	)
 	async def login(self, request: Request):
-		body = await request.json()
+		body = request['validated_body']
 
 		username = body.get('username')
 		password = body.get('password')
-
-		username_is_valid, valid_error = Validate.username(username)
-		if not username_is_valid:
-			raise ValidationError(valid_error)
-
-		password_is_valid, valid_error = Validate.password(password)
-		if not password_is_valid:
-			raise ValidationError(valid_error)
 
 		user = await UserRepositorty.get_by_username(request.db_session, username)
 		if user is None:
@@ -115,23 +111,21 @@ class AuthConrtoller:
 
 		reset_type = request.query.get('type')
 		if not isinstance(reset_type, str) or not reset_type in ('e', 'u',):
-			raise ValidationError('[type] must be specified in query ([e] - by email, [u] - by username)')
+			raise ValidationError({
+				'type': 'must be specified in query ([e] - by email, [u] - by username)',
+			})
 
 		user = None
 		specified_data = None
 
 		if reset_type == 'e':
 			email = request.query.get('email')
-			email_is_valid, valid_error = Validate.email(email)
-			if not email_is_valid:
-				raise ValidationError(valid_error)
+			ValidateField.email()(email)
 			user = await UserRepositorty.get_by_email(request.db_session, email)
 			specified_data = email
 		else:
 			username = request.query.get('username')
-			username_is_valid, valid_error = Validate.username(username)
-			if not username_is_valid:
-				raise ValidationError(valid_error)
+			ValidateField.username()(username)
 			user = await UserRepositorty.get_by_username(request.db_session, username)
 			specified_data = username
 
@@ -143,10 +137,7 @@ class AuthConrtoller:
 
 		#* Checking for spam to OTP generation
 		if not (await OtpRepository.can_update(request.db_session, user.email_address)):
-			raise SpamError(
-				server_message=f'Got spam ({user.email_address})',
-				response_message = 'Wait a minute before resend the OTP code',
-			)
+			raise OtpSpam(user.email_address)
 
 		#* Updating user OTP
 		otp = await OtpRepository.create_or_update(request.db_session, user.email_address)
@@ -160,6 +151,9 @@ class AuthConrtoller:
 
 		return json_response(data = otp.to_json(safe=reset_type == 'e'))
 
+	@validate_request_body(
+		ValidateField.otp_code(),
+	)
 	async def verify_otp_for_reset_password(self, request: Request):
 		#! Need a type:
 		#! e - by email
@@ -167,33 +161,28 @@ class AuthConrtoller:
 
 		reset_type = request.query.get('type')
 		if not isinstance(reset_type, str) or not reset_type in ('e', 'u',):
-			raise ValidationError('[type] must be specified in query ([e] - by email, [u] - by username)')
+			raise ValidationError({
+				'type': 'must be specified in query ([e] - by email, [u] - by username)',
+			})
 
 		specified_data = None
 
 		if reset_type == 'e':
 			email = request.query.get('email')
-			email_is_valid, valid_error = Validate.email(email)
-			if not email_is_valid:
-				raise ValidationError(valid_error)
+			ValidateField.email()(email)
 			user = await UserRepositorty.get_by_email(request.db_session, email)
 			specified_data = email
 		else:
 			username = request.query.get('username')
-			username_is_valid, valid_error = Validate.username(username)
-			if not username_is_valid:
-				raise ValidationError(valid_error)
+			ValidateField.username()(username)
 			user = await UserRepositorty.get_by_username(request.db_session, username)
 			specified_data = username
 
 		if user is None:
 			raise CouldNotFoundUserWithSpecifiedData(specified_data)
 
-		body = await request.json()
+		body = request['validated_body']
 		otp_code = body.get('otp_code')
-		otp_code_is_valid, valid_error = Validate.otp_code(otp_code)
-		if not otp_code_is_valid:
-			raise ValidationError(valid_error)
 
 		await OtpRepository.verify(request.db_session, user.email_address, otp_code)
 

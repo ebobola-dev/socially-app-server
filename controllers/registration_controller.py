@@ -7,7 +7,7 @@ from models.otp import OtpDestiny
 from models.exceptions.api_exceptions import *
 from models.role import Role
 
-from utils.my_validators import Validate
+from utils.my_validator.my_validator import validate_request_body, ValidateField
 from services.email_service import EmailService
 from services.tokens_service import TokensService
 from repositories.otp_repository import OtpRepository
@@ -17,20 +17,15 @@ class RegistrationController:
 	def __init__(self, logger: Logger):
 		self._logger = logger
 
+	@validate_request_body(
+		ValidateField.email(),
+	)
 	async def check_email(self, request: Request):
-		body = await request.json()
-		email = body.get('email')
-
-		email_is_valid, valid_error = Validate.email(email)
-		if not email_is_valid:
-			raise ValidationError(valid_error)
+		email = request['validated_body']['email']
 
 		#* Checking for spam to OTP generation
 		if not (await OtpRepository.can_update(request.db_session, email)):
-			raise SpamError(
-				server_message=f'Got spam ({email})',
-				response_message = 'Wait a minute before resend the OTP code',
-			)
+			raise OtpSpam(email)
 
 		#* Check user exists
 		user = await UserRepositorty.get_by_email(request.db_session, email)
@@ -49,13 +44,14 @@ class RegistrationController:
 
 		return json_response(data = otp.to_json(safe=True))
 
+	@validate_request_body(
+		ValidateField.email(),
+		ValidateField.otp_code(),
+		ValidateField(field_name='owner_key', required=False, nullable=True)
+	)
 	async def check_otp(self, request: Request):
-		body = await request.json()
+		body: dict = request['validated_body']
 		email = body.get('email')
-
-		email_is_valid, valid_error = Validate.email(email)
-		if not email_is_valid:
-			raise ValidationError(valid_error)
 
 		#* Check user with registration completed
 		user = await UserRepositorty.get_by_email(request.db_session, email)
@@ -63,9 +59,6 @@ class RegistrationController:
 			raise UserWithEmailHasAlreadyCompletedRegistration(email_address=email)
 
 		otp_code = body.get('otp_code')
-		otp_code_is_valid, valid_error = Validate.otp_code(otp_code)
-		if not otp_code_is_valid:
-			raise ValidationError(valid_error)
 
 		await OtpRepository.verify(request.db_session, email, otp_code)
 
@@ -77,8 +70,9 @@ class RegistrationController:
 			new_user_role = Role.user
 			if owner_key and SERVER_CONFIG.OWNER_KEY and SERVER_CONFIG.OWNER_KEY == owner_key:
 				new_user_role = Role.owner
-				self._logger.warning(f'OWNER user has registered, email: {email}')
 			user = await UserRepositorty.create_new(request.db_session, email, new_user_role)
+			if new_user_role == Role.owner:
+				self._logger.warning(f'OWNER user has registered, email: {email}')
 		else:
 			if user.role != Role.owner:
 				if owner_key and SERVER_CONFIG.OWNER_KEY and SERVER_CONFIG.OWNER_KEY == owner_key:
@@ -103,8 +97,16 @@ class RegistrationController:
 			'user_role': user.role.value,
 		})
 
+	@validate_request_body(
+		ValidateField.fullname(),
+		ValidateField.date_of_birth(),
+		ValidateField.gender(),
+		ValidateField.about_me(),
+		ValidateField.username(),
+		ValidateField.password(),
+	)
 	async def complete_registration(self, request: Request):
-		body = await request.json()
+		body: dict = request['validated_body']
 
 		fullname = body.get('fullname')
 		date_of_birth = body.get('date_of_birth')
@@ -113,40 +115,16 @@ class RegistrationController:
 		username = body.get('username')
 		password = body.get('password')
 
-		#* ---------------------------------------------- Validations ----------------------------------------------
-		#? Fullname (Not reqiured)
-		fullname_is_valid, valid_error = Validate.fullname(fullname)
-		if not fullname_is_valid:
-			raise ValidationError(valid_error)
-
-		#? Date of birth (Reqiured)
-		date_of_birth_is_valid, valid_error = Validate.date_of_birth(date_of_birth)
-		if not date_of_birth_is_valid:
-			raise ValidationError(valid_error)
 		date_of_birth = date.fromisoformat(date_of_birth)
 
-		#? Gender (Not Reqiured)
-		gender_is_valid, valid_error = Validate.gender(gender)
-		if not gender_is_valid:
-			raise ValidationError(valid_error)
+		different_time = date.today() - date_of_birth
+		if different_time.days <= 0:
+			raise ValidationError({
+				'date_of_birth': 'must be day before today'
+			})
+
 		if gender is not None:
 			gender = Gender(gender)
-
-		#? About me (Not required)
-		about_me_is_valid, valid_error = Validate.about_me(about_me)
-		if not about_me_is_valid:
-			raise ValidationError(valid_error)
-
-		#? Username (Required)
-		username_is_valid, valid_error = Validate.username(username)
-		if not username_is_valid:
-			raise ValidationError(valid_error)
-
-		#? Password (Required)
-		password_is_valid, valid_error = Validate.password(password)
-		if not password_is_valid:
-			raise ValidationError(valid_error)
-		#* -------------------------------------------- End Validations --------------------------------------------
 
 		#* Find the user by id
 		user_id = request.user_id

@@ -7,87 +7,124 @@ from packaging.version import Version
 
 class ApiError(Exception):
 	def __init__(
-			self,
-			response_status_code: int = 500,
-			server_message: str = 'Unexcepted server error',
-			response_message: str = 'Something went wrong',
+		self,
+		response_status_code: int = 500,
+		server_message: str = 'Unexcepted server error',
+		global_errors: list[str] = ['Something went wrong'],
+		field_specific_erros: dict[str, list] = {},
 	):
 		super().__init__(server_message)
-		self.server_message = server_message
+		self.server_message = f'{type(self).__name__} {server_message}'
 		self.response_status_code = response_status_code
-		self.response_message = response_message
+		self.global_errors = global_errors
+		self.field_specific_erros = field_specific_erros
 
 	def to_json(self):
-		return {
-			'error_text': self.response_message
+		json_view = {
+			'errors': {
+				'_global': self.global_errors,
+
+			}
 		}
+		for key, value in self.field_specific_erros.items():
+			json_view['errors'][key] = value
+		return json_view
 
 class UnauthorizedError(ApiError):
-	def __init__(self, response_message = 'You are not authorized'):
+	def __init__(self, global_errors = ['You are not authorized']):
 		super().__init__(
 			response_status_code = 401,
 			server_message = 'Could not found or validate access/refresh token',
-			response_message = response_message,
+			global_errors = global_errors,
 		)
 
 class ForbiddenError(ApiError):
-	def __init__(self,
+	def __init__(
+		self,
 		server_message = 'Forbidden',
-		response_message = 'Forbidden'
+		global_errors: list[str] = ['Forbidden']
 	):
-		super().__init__(403, server_message, response_message)
+		super().__init__(403, server_message, global_errors)
 
 class ForbiddenForRole(ForbiddenError):
-	def __init__(self,
+	def __init__(
+		self,
 		input_role: Role,
 		required_role: Role,
 	):
 		super().__init__(
 			server_message = f'Input role ({input_role.name}), required role: ({required_role.name})',
-			response_message = f'Required role: {required_role.name}',
+			global_errors = [f'Required role: {required_role.name}'],
 		)
 
 class IncompleteRegistration(ForbiddenError):
 	def __init__(self, email):
 		super().__init__(
 			server_message = f'{email} has not completed registration yet',
-			response_message = 'Complete the registration',
+			global_errors = ['Complete the registration'],
 		)
 
 class SpamError(ApiError):
 	def __init__(self,
 		server_message = 'Got spam',
-		response_message = 'Too many requests',
+		global_errors = ['Too many requests'],
 	):
 		super().__init__(
 			response_status_code = 429,
 			server_message = server_message,
-			response_message = response_message,
+			global_errors = global_errors,
+		)
+
+class OtpSpam(SpamError):
+	def __init__(self, email_address: str):
+		super().__init__(
+			server_message=f'Got otp spam from email: {email_address}',
+			global_errors=['Wait a minute before resend the OTP code'],
 		)
 
 class BadRequest(ApiError):
 	def __init__(
-			self,
-			server_message: str,
-			response_message: str,
-		):
-		super().__init__(400, server_message, response_message)
+		self,
+		server_message: str,
+		global_errors: list[str] = [],
+		field_specific_erros: dict[str, list] = {},
+	):
+		gl_errs = global_errors.copy()
+		if not gl_errs and not field_specific_erros:
+			gl_errs = [server_message]
+		super().__init__(
+			400,
+			server_message,
+			gl_errs,
+			field_specific_erros=field_specific_erros,
+		)
 
-class NotFound(BadRequest):
+class NotFound(ApiError):
 	def __init__(
 			self,
 			path: str,
 		):
 		super().__init__(
+			response_status_code=404,
 			server_message = f'Trying to {path}',
-			response_message ='404: Not Found'
+			global_errors = ['404: Not Found']
 		)
 
-class BadDeviceID(BadRequest):
-	def __init__(self, valid_error: str = '?'):
+class ValidationError(BadRequest):
+	def __init__(self, field_specific_erros: dict[str, list], server_message: str | None = None):
 		super().__init__(
-			server_message = f'Bad device id: {valid_error}',
-			response_message = '[device_id] must be specified in request headers',
+			server_message = server_message or field_specific_erros,
+			global_errors=[],
+			field_specific_erros=field_specific_erros,
+		)
+
+class BadDeviceID(ValidationError):
+	def __init__(self, input_device_id, valid_message: str | None = None):
+		super().__init__(
+			field_specific_erros={
+				'device_id': valid_message or 'must be specified',
+			},
+			server_message = f'Bad device id: {input_device_id}'
 		)
 
 class BadContentType(BadRequest):
@@ -98,37 +135,46 @@ class BadContentType(BadRequest):
 		):
 		super().__init__(
 			f'Bad content type: {input_type}, required: {required_type}',
-			f'Content-Type must be "{required_type}"',
+			global_errors = [f'Content-Type must be "{required_type}"'],
 		)
 
 class UnableToDecodeJsonBody(BadRequest):
 	def __init__(self, error = '?'):
-		super().__init__(error, 'Bad json body')
-
-class ResetContent(ApiError):
-	def __init__(
-			self,
-			server_message: str,
-			response_message: str,
-		):
-		super().__init__(205, server_message, response_message)
-
-class NotModified(ApiError):
-	def __init__(
-			self,
-			server_message: str = 'Not modified',
-			response_message: str = 'Nothing to update',
-		):
-		super().__init__(304, server_message, response_message)
-
-class ValidationError(BadRequest):
-	def __init__(self, validate_error_message, server_message = None):
 		super().__init__(
-			server_message = validate_error_message if server_message is None else server_message,
-			response_message = validate_error_message,
+			server_message=error,
+			global_errors=['Bad body'],
 		)
 
-class OwnerAlreadyRegistered(ValidationError):
+class AlreadyFollowing(BadRequest):
+	def __init__(self, sub_username, target_username):
+		super().__init__(
+			server_message = f'@{sub_username} already following @{target_username}',
+			global_errors = ['You are already following the target user'],
+		)
+
+class NotFollowingAnyway(BadRequest):
+	def __init__(self, sub_username, target_username):
+		super().__init__(
+			server_message = f'@{sub_username} not following @{target_username} anyway',
+			global_errors = ['You are not following the target user anyway'],
+		)
+
+class NothingToUpdate(BadRequest):
+	def __init__(
+		self,
+		server_message: str = 'Nothing to update',
+		global_errors: list[str] = ['Nothing to update'],
+	):
+		super().__init__(server_message, global_errors)
+
+
+class UnableToValidate(ApiError):
+	def __init__(self, field_name: str, error):
+		super().__init__(
+			server_message=f'unable to validate field: {field_name}, {error}',
+		)
+
+class OwnerAlreadyRegistered(BadRequest):
 	def __init__(self):
 		super().__init__('Owner already registered')
 
@@ -141,7 +187,7 @@ class ImageIsTooLarge(BadRequest):
 		str_size = '?'
 		if request_content_length.isdigit():
 			str_size = SizeUtils.bytes_to_human_readable(int(request_content_length))
-		super().__init__(f'Image is too large ({str_size})', f'Image is too large (max: {SERVER_CONFIG.MAX_IMAGE_SIZE}MB)')
+		super().__init__(f'Image is too large ({str_size})', [f'Image is too large (max: {SERVER_CONFIG.MAX_IMAGE_SIZE}MB)'])
 
 class DatabaseError(ApiError):
 	def __init__(
@@ -154,104 +200,94 @@ class CouldNotSendOtpToEmail(BadRequest):
 	def __init__(self, email_address, email_error = '?'):
 		super().__init__(
 			server_message = f"Error on sending OTP code to email {email_address}: {email_error}",
-			response_message = f"Could not send the OTP code to the specified email address",
+			global_errors = [f"Could not send the OTP code to the specified email address"],
 		)
 
 class UserWithEmailHasAlreadyCompletedRegistration(BadRequest):
 	def __init__(self, email_address):
 		super().__init__(
 			server_message = f'User with email ({email_address}) already exists and his registration is completed',
-			response_message = 'You are already registered, please log in',
+			global_errors = ['You are already registered, please log in'],
 		)
 
 class CouldNotFoundOtpWithEmail(BadRequest):
 	def __init__(self, email_address):
 		super().__init__(
 			server_message = f'Could not found OTP with email: {email_address}',
-			response_message = 'Could not found OTP with your email, resend the otp code',
+			global_errors = ['Could not found OTP with your email, resend the otp code'],
 		)
 
 class IncorrectOtpCode(BadRequest):
 	def __init__(self):
 		super().__init__(
 			server_message = 'Incorrect OTP code',
-			response_message = 'Incorrect OTP code',
+			global_errors = ['Incorrect OTP code'],
 		)
 
 class OtpCodeIsOutdated(BadRequest):
 	def __init__(self):
 		super().__init__(
 			server_message = 'The OTP code is outdated',
-			response_message = 'Your OTP code is outdated, resend the new OTP code',
+			global_errors = ['Your OTP code is outdated, resend the new OTP code'],
 		)
 
 class CouldNotFoundUserWithId(BadRequest):
 	def __init__(self, user_id: str):
 		super().__init__(
 			server_message = f'Could not found user with id ({user_id})',
-			response_message = f'Could not found user with id ({user_id})',
+			global_errors = [f'Could not found user with id ({user_id})'],
 		)
 
 class UsernameIsAlreadyTaken(BadRequest):
 	def __init__(self, username: str):
 		super().__init__(
-			server_message = f'Username ({username}) is already taken',
-			response_message = f'Username ({username}) is already taken',
+			server_message = f'Username @{username} is already taken',
+			global_errors = [f'Username @{username} is already taken'],
 		)
 
 class IncorrectLoginData(BadRequest):
 	def __init__(self, server_message: str = 'Incorrect login data'):
 		super().__init__(
 			server_message = server_message,
-			response_message = f'Incorrect data',
+			global_errors = [f'Incorrect data'],
 		)
 
 class CouldNotFoundUserWithSpecifiedData(BadRequest):
 	def __init__(self, specified_data):
 		super().__init__(
 			server_message = f'Could not found user with specified data ({specified_data})',
-			response_message = f'Could not found user with specified data ({specified_data})',
+			global_errors = [f'Could not found user with specified data ({specified_data})'],
 		)
 
 class TryingToResetPasswordWithIncompletedRegistration(BadRequest):
 	def __init__(self):
 		super().__init__(
 			server_message = 'Trying to reset password with incompleted registration',
-			response_message = "You haven't completed registration",
+			global_errors = ["You haven't completed registration"],
 		)
 
 class AvatarTypeIsNotExternal(BadRequest):
 	def __init__(self):
 		super().__init__(
 			server_message = 'User avatar type is not external',
-			response_message = "The target user does not have an external avatar image",
-		)
-
-class AlreadyFollowingTargetUser(ResetContent):
-	def __init__(self):
-		super().__init__(
-			server_message = 'Already following the target user',
-			response_message = "You are already following the target user",
-		)
-
-class IsNotFollowingTargetUser(ResetContent):
-	def __init__(self):
-		super().__init__(
-			server_message = 'Is not following the target user anyway',
-			response_message = "You are not following the target user anyway",
+			global_errors = ["The target user does not have an external avatar image"],
 		)
 
 class BadImageFileExt(BadRequest):
 	def __init__(self, bad_ext):
 		super().__init__(
 			server_message = f'Got bad image file ext {bad_ext}',
-			response_message = f'Bad avatar image file ext, allowed: {SERVER_CONFIG.ALLOWED_IMAGE_EXTENSIONS}',
+			global_errors = [f'Bad avatar image file ext, allowed: {SERVER_CONFIG.ALLOWED_IMAGE_EXTENSIONS}'],
 		)
 
-class CouldNotFoundApkUpdateWithVersion(ValidationError):
+class CouldNotFoundApkUpdateWithVersion(BadRequest):
 	def __init__(self, version: Version):
 		super().__init__(f'Could not found apk update with version "{version}"')
 
-class ApkUpdateWithVersionAlreadyExists(ValidationError):
+class ApkUpdateWithVersionAlreadyExists(BadRequest):
 	def __init__(self, version: Version):
 		super().__init__(f'Apk update with version ({version}) already exists')
+
+class UserDoesNotHaveExternalAvatarImage(BadRequest):
+	def __init__(self, username: str):
+		super().__init__(f'Target user does not have an external avatar (@{username})')
