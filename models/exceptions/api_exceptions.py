@@ -224,6 +224,13 @@ class IncorrectOtpCode(BadRequest):
 			global_errors = ['Incorrect OTP code'],
 		)
 
+class CantFollowUnlollowYouself(BadRequest):
+	def __init__(self):
+		super().__init__(
+			server_message = "You can't follow(unfollow) to youself",
+			global_errors = ["You can't follow(unfollow) to youself"],
+		)
+
 class OtpCodeIsOutdated(BadRequest):
 	def __init__(self):
 		super().__init__(

@@ -152,7 +152,7 @@ class UserRepositorty:
 	@staticmethod
 	async def follow(session: AsyncSession, subscriber_id: str, target_id: str) -> User:
 		if subscriber_id == target_id:
-			raise ValidationError("You can't follow(unfollow) to youself")
+			raise CantFollowUnlollowYouself()
 		subscriber = await session.get(User, subscriber_id)
 		target = await session.get(User, target_id)
 		if not subscriber:
@@ -178,7 +178,7 @@ class UserRepositorty:
 	@staticmethod
 	async def unfollow(session: AsyncSession, subscriber_id: str, target_id: str) -> User:
 		if subscriber_id == target_id:
-			raise ValidationError("You can't follow(unfollow) to youself")
+			raise CantFollowUnlollowYouself()
 		subscriber = await session.get(User, subscriber_id)
 		target = await session.get(User, target_id)
 		if not subscriber:
