@@ -64,7 +64,7 @@ class ApkUpdatesController:
 
 		apk_file_buffer = None
 		version = None
-		description = None
+		descriptions = []
 		size = 0
 
 		async for part in reader:
@@ -86,22 +86,23 @@ class ApkUpdatesController:
 						size += len(chunk)
 						apk_file_buffer.write(chunk)
 					apk_file_buffer.seek(0)
-				case 'description':
-					try:
-						description = (await part.text()).strip()
-					except:
-						raise ValidationError({
-							'description': 'must be a string',
-						})
+			if part.name and part.name.startswith("description-"):
+				try:
+					descriptions.append((await part.text()).strip())
+				except:
+					raise ValidationError({
+						'description-?': 'must be a string',
+					})
 
 		if not apk_file_buffer:
 			raise ValidationError({
 				'apk': 'must be specified, must be a file',
 			})
-		if not description:
+		if not descriptions:
 			raise ValidationError({
 				'description': 'must be specified, must be a string',
 			})
+		self._logger.debug(f'got descriptions: {descriptions}\n')
 
 		ValidateField.version()(version)
 		version = Version(version)
@@ -115,7 +116,7 @@ class ApkUpdatesController:
 		sha256_hash = await asyncio.to_thread(lambda: FileUtils.calculate_sha256_from_bytesio(apk_file_buffer))
 		new_apk_update = ApkUpdate(
 			version = version,
-			description = description,
+			descriptions = descriptions,
 			file_size = size,
 			sha256_hash = sha256_hash,
 		)
@@ -131,6 +132,7 @@ class ApkUpdatesController:
 		return json_response(
 			data = new_apk_update.to_json()
 		)
+		raise HTTPNotImplemented()
 
 	async def delete(self, request: Request):
 		version = request.query.get('version')
