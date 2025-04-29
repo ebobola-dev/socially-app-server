@@ -66,8 +66,15 @@ class Middlewares:
 			status_code = 500
 			if hasattr(http_error, 'status_code'):
 				status_code = http_error.status_code
+			api_error = ApiError(
+				response_status_code=status_code,
+				global_errors=[str(http_error)]
+			)
 			self._logger.error(f'[{request.path} -> {status_code}] {type(http_error).__name__} {http_error}\n')
-			return Response(status=status_code)
+			return json_response(
+				status = api_error.response_status_code,
+				data = api_error.to_json(),
+			)
 		except Exception as unexcepted_error:
 			handle_time = time() - start_time
 			err = ApiError()
