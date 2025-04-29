@@ -33,8 +33,8 @@ class ApkUpdateRepository:
 		if min_version:
 			query = select(ApkUpdate).where(ApkUpdate.version >= min_version).order_by(ApkUpdate.version.desc())
 		else:
-			query = select(ApkUpdate)
-		result = await session.scalars(query).order_by(ApkUpdate.version.desc())
+			query = select(ApkUpdate).order_by(ApkUpdate.version.desc())
+		result = await session.scalars(query)
 		return result.all()
 
 	@staticmethod
