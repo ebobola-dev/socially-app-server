@@ -132,7 +132,6 @@ class ApkUpdatesController:
 		return json_response(
 			data = new_apk_update.to_json()
 		)
-		raise HTTPNotImplemented()
 
 	async def delete(self, request: Request):
 		version = request.query.get('version')
