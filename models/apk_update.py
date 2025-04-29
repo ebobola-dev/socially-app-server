@@ -12,7 +12,7 @@ class ApkUpdate(BaseModel):
 
 	id: Mapped[CHAR] = mapped_column(CHAR(36), primary_key=True, default=lambda: str(uuid4()), unique=True, nullable=False)
 	version: Mapped[VersionType] = mapped_column(VersionType, unique=True, nullable=False)
-	descriptions: Mapped[JSON] = mapped_column(JSON, nullable=False)
+	descriptions: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 	uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 	file_size: Mapped[int] = mapped_column(Integer, nullable=False)
 	sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False)
