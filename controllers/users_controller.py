@@ -15,7 +15,7 @@ from utils.sizes import SizeUtils
 from services.file_service import FileService
 from controllers.sio_controller import SioController
 from repositories.user_repository import UserRepositorty
-
+from controllers.middlewares import *
 
 from config.server_config import SERVER_CONFIG
 from config.length_requirements import LENGTH_REQIREMENTS
@@ -33,6 +33,7 @@ class UsersController:
 		self._logger.debug(f'@{username} is {"not exists" if user is None else "exists"}\n')
 		return json_response(data = { 'is_exists': user is not None })
 
+	@authenticate()
 	async def get_by_id(self, request: Request):
 		user_id = request.match_info['user_id']
 		user = await UserRepositorty.get_by_id(request.db_session, user_id)
@@ -40,6 +41,7 @@ class UsersController:
 			raise CouldNotFoundUserWithId(user_id)
 		return json_response(data = user.to_json( safe = user_id == request.user_id ))
 
+	@authenticate()
 	async def search(self, request: Request):
 		pagination = Pagination.from_request(request)
 		search_data = request.query.get('search_data', None)
@@ -68,6 +70,8 @@ class UsersController:
 			'users': result_json,
 		})
 
+	@authenticate()
+	@content_type_is_json()
 	@validate_request_body(
 		ValidateField.fullname(required=False),
 		ValidateField.username(required=False),
@@ -126,6 +130,8 @@ class UsersController:
 
 		return json_response({ "updated_user": updated_user.to_json(safe = True) })
 
+	@authenticate()
+	@content_type_is_json()
 	@validate_request_body(
 		ValidateField.password(field_name='new_password')
 	)
@@ -137,6 +143,8 @@ class UsersController:
 		self._logger.debug(f'Password updated [{user.email_address}]')
 		return json_response()
 
+	@authenticate()
+	@content_type_is_multipart()
 	async def update_avatar(self, request: Request):
 		user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
 		content_length = request.headers.get('Content-Length')
@@ -221,6 +229,7 @@ class UsersController:
 			self._logger.debug(f'@{user.username} changed avatar to {avatar_type}')
 			return json_response(data = { 'updated_user': updated_user.to_json(safe = True) })
 
+	@authenticate()
 	async def delete_avatar(self, request: Request):
 		user_id = request.user_id
 		saved_user = await UserRepositorty.get_by_id(request.db_session, user_id)
@@ -245,6 +254,7 @@ class UsersController:
 			raise UserDoesNotHaveExternalAvatarImage(target_user.username)
 		return FileResponse(avatar_file_path)
 
+	@authenticate()
 	async def follow(self, request: Request):
 		user_id = request.user_id
 		target_id = request.query.get('target_id')
@@ -263,6 +273,7 @@ class UsersController:
 			)
 		return json_response({ "updated_user": updated_user.to_json(safe = True) })
 
+	@authenticate()
 	async def unfollow(self, request: Request):
 		user_id = request.user_id
 		target_id = request.query.get('target_id')
@@ -273,6 +284,7 @@ class UsersController:
 		updated_user = await UserRepositorty.unfollow(request.db_session, user_id, target_id )
 		return json_response({ "updated_user": updated_user.to_json(safe = True) })
 
+	@authenticate()
 	async def get_followings(self, request: Request):
 		target_id = request.query.get('target_id')
 		pagination = Pagination.from_request(request)
@@ -291,6 +303,7 @@ class UsersController:
 			'followings': list(map(lambda u: u.to_json(short=True), target_followings))
 		})
 
+	@authenticate()
 	async def get_followers(self, request: Request):
 		target_id = request.query.get('target_id')
 		pagination = Pagination.from_request(request)
@@ -309,6 +322,8 @@ class UsersController:
 			'followers': list(map(lambda u: u.to_json(short=True), target_followers))
 		})
 
+	@authenticate()
+	@owner_role()
 	async def update_role(self, request: Request):
 		target_id = request.query.get('target_id')
 		new_role = request.query.get('new_role')

@@ -2,6 +2,7 @@ from logging import Logger
 from bcrypt import checkpw
 from aiohttp.web import Request, json_response
 
+from controllers.middlewares import *
 from services.tokens_service import TokensService
 from repositories.user_repository import UserRepositorty
 from repositories.otp_repository import OtpRepository
@@ -16,6 +17,8 @@ class AuthConrtoller:
 		self._logger = logger
 		self._sio = main_sio_namespace
 
+	@content_type_is_json()
+	@device_id_specified()
 	@validate_request_body(
 		ValidateField.username(),
 		ValidateField.password(),
@@ -48,6 +51,7 @@ class AuthConrtoller:
 			'user': user.to_json(safe = True),
 		})
 
+	@device_id_specified()
 	async def refresh(self, request: Request):
 		authorization_headers = request.headers.get('authorization')
 		if authorization_headers is None:
@@ -88,6 +92,8 @@ class AuthConrtoller:
 			'user': user.to_json(safe = True),
 		})
 
+	@authenticate()
+	@device_id_specified()
 	async def logout(self, request: Request):
 		user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
 		await self._sio.on_logout(user.current_sid)
@@ -151,6 +157,8 @@ class AuthConrtoller:
 
 		return json_response(data = otp.to_json(safe=reset_type == 'e'))
 
+	@content_type_is_json()
+	@device_id_specified()
 	@validate_request_body(
 		ValidateField.otp_code(),
 	)

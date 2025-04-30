@@ -44,45 +44,4 @@ class PATHS:
 		DELETE = f'{_base_path}/delete'
 		DOWNLOAD = f'{_base_path}/download'
 
-class MIDDLEWARE_PATHS:
-	#? Paths that can obly be requested by authorized
-	AUTH = (
-		PATHS.REGISTRATION.COMPLETE_REGISTRATION,
-		PATHS.AUTH.LOGOUT,
-		PATHS.USERS._base_path,
-		PATHS.TEST_USERS._base_path,
-		PATHS.APK_UPDATES.ADD,
-		PATHS.APK_UPDATES.DELETE,
-	)
-	#? Paths where Content-Type must be a json
-	JSON_CONTENT_TYPE = (
-		PATHS.REGISTRATION._base_path,
-		PATHS.AUTH.LOGIN,
-		PATHS.AUTH.RESET_PASSWORD.VERIFY_OTP,
-		PATHS.USERS.UPDATE_PROFILE,
-		PATHS.USERS.UPDATE_PASSWORD,
-	)
-	#? Paths where Content-Type must be a multipart/form-data
-	MULTIPART_FORMDATA_CONTENT_TYPE = (
-		PATHS.USERS.UPDATE_AVATAR,
-		PATHS.APK_UPDATES.ADD,
-	)
-	#? Paths where device_id must be specified
-	DEVICE_ID_SPECIFIED = (
-		PATHS.REGISTRATION.VERIFY_OTP,
-		PATHS.AUTH.LOGIN,
-		PATHS.AUTH.LOGOUT,
-		PATHS.AUTH.REFRESH,
-		PATHS.AUTH.RESET_PASSWORD.VERIFY_OTP,
-	)
-	#? Paths that can only be requested by users after completing thier registration
-	IS_REGISTRATION_COMPLETE = PATHS.USERS._base_path,
-	OWNER_ROLE = (
-		PATHS.TEST_USERS.OWNER_ROLE_TEST,
-		PATHS.USERS.UPDATE_ROLE,
-		PATHS.APK_UPDATES.ADD,
-		PATHS.APK_UPDATES.DELETE,
-	)
-	ADMIN_ROLE = PATHS.TEST_USERS.ADMIN_ROLE_TEST,
-
 

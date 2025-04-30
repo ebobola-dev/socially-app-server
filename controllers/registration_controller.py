@@ -7,6 +7,7 @@ from models.otp import OtpDestiny
 from models.exceptions.api_exceptions import *
 from models.role import Role
 
+from controllers.middlewares import *
 from utils.my_validator.my_validator import validate_request_body, ValidateField
 from services.email_service import EmailService
 from services.tokens_service import TokensService
@@ -17,6 +18,7 @@ class RegistrationController:
 	def __init__(self, logger: Logger):
 		self._logger = logger
 
+	@content_type_is_json()
 	@validate_request_body(
 		ValidateField.email(),
 	)
@@ -44,6 +46,8 @@ class RegistrationController:
 
 		return json_response(data = otp.to_json(safe=True))
 
+	@content_type_is_json()
+	@device_id_specified()
 	@validate_request_body(
 		ValidateField.email(),
 		ValidateField.otp_code(),
@@ -97,6 +101,8 @@ class RegistrationController:
 			'user_role': user.role.value,
 		})
 
+	@authenticate()
+	@content_type_is_json()
 	@validate_request_body(
 		ValidateField.fullname(),
 		ValidateField.date_of_birth(),

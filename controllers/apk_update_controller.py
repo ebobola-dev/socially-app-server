@@ -5,6 +5,7 @@ from packaging.version import Version
 from io import BytesIO
 from re import fullmatch
 
+from controllers.middlewares import *
 from models.exceptions.api_exceptions import *
 from controllers.sio_controller import SioController
 from repositories.apk_update_repository import ApkUpdateRepository
@@ -59,6 +60,9 @@ class ApkUpdatesController:
 			}
 		)
 
+	@authenticate()
+	@owner_role()
+	@content_type_is_multipart()
 	async def add(self, request: Request):
 		reader = await request.multipart()
 
@@ -133,6 +137,8 @@ class ApkUpdatesController:
 			data = new_apk_update.to_json()
 		)
 
+	@authenticate()
+	@owner_role()
 	async def delete(self, request: Request):
 		version = request.query.get('version')
 		ValidateField.version()(version)

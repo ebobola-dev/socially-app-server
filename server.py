@@ -56,14 +56,7 @@ async def main():
 	app = web.Application(
 		middlewares = (
 			middlewares.error_middleware,
-			middlewares.content_type_is_json,
-			middlewares.content_type_is_multipart_formdata,
-			middlewares.check_device_id,
 			middlewares.database_session,
-			middlewares.check_authorized,
-			middlewares.registration_completed,
-			middlewares.admin_role,
-			middlewares.owner_role,
 		),
 	)
 	sio.attach(app)
