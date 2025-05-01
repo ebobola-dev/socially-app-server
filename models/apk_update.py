@@ -12,7 +12,7 @@ from utils.sizes import SizeUtils
 class ApkUpdate(BaseModel):
     __tablename__ = "apk_updates"
 
-    id: Mapped[CHAR] = mapped_column(
+    id: Mapped[str] = mapped_column(
         CHAR(36),
         primary_key=True,
         default=lambda: str(uuid4()),

@@ -49,7 +49,7 @@ def authenticate():
             try:
                 data = _get_access_token_data(request.headers.get("authorization"))
                 user_id = data.get("id")
-                user = await UserRepositorty.get_by_id(request.db_session, user_id)
+                user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
                 if not user:
                     raise UnauthorizedError()
                 request.user_id = user_id
@@ -120,7 +120,7 @@ def registration_completed():
     def decorator(handler):
         @wraps(handler)
         async def wrapper(self, request: Request):
-            user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+            user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
             if not user:
                 raise UnauthorizedError()
             if not user.is_registration_completed:

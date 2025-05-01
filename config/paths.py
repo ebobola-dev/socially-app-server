@@ -23,6 +23,7 @@ class Paths:
         _base_path = f"{_base_api_path}/users"
         CHECK_USERNAME = f"{_base_path}/check_username"
         GET_BY_ID = f"{_base_path}/{{user_id}}"
+        DELETE = _base_path
         SEARCH = f"{_base_path}/search"
         UPDATE_PROFILE = f"{_base_path}/update_profile"
         UPDATE_PASSWORD = f"{_base_path}/update_password"

@@ -14,3 +14,12 @@ class LengthRequirements:
         MIN = 8
         MAX = 16
         TEXT = f"at least one letter, at least one digit, between {MIN} and {MAX} characters"
+
+    class PostTextContent:
+        MAX = 2048
+
+    class Comment:
+        MAX = 2048
+
+    class MessageTextContent:
+        MAX = 10000

@@ -71,6 +71,15 @@ class TokensService:
         await RefreshTokenRepository.delete_one(session, user_id, device_id)
 
     @staticmethod
+    async def delete_all_by_user_id(
+        session: AsyncSession,
+        user_id: str,
+    ):
+        await RefreshTokenRepository.delete_all_by_user_id(
+            session=session, user_id=user_id
+        )
+
+    @staticmethod
     async def get_refresh_by_user_and_device_ids(
         session: AsyncSession, user_id, device_id
     ):

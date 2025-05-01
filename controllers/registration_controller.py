@@ -10,10 +10,10 @@ from controllers.middlewares import (
     device_id_specified,
 )
 from models.exceptions.api_exceptions import (
-    CouldNotFoundUserWithIdError,
     CouldNotSendOtpToEmailError,
     OtpSpamError,
     UsernameIsAlreadyTakenError,
+    UserNotFoundError,
     UserWithEmailHasAlreadyCompletedRegistrationError,
     ValidationError,
 )
@@ -163,9 +163,9 @@ class RegistrationController:
         # * Find the user by id
         user_id = request.user_id
 
-        user = await UserRepositorty.get_by_id(request.db_session, user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
         if user is None:
-            raise CouldNotFoundUserWithIdError(user_id)
+            raise UserNotFoundError(user_id)
         if user is not None and user.is_registration_completed:
             raise UserWithEmailHasAlreadyCompletedRegistrationError(user.email_address)
 

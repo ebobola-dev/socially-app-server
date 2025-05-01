@@ -19,11 +19,12 @@ from models.avatar_type import AvatarType
 from models.exceptions.api_exceptions import (
     BadImageFileExtError,
     BadRequestError,
-    CouldNotFoundUserWithIdError,
     ImageIsTooLargeError,
     NothingToUpdateError,
+    UnauthorizedError,
     UserDoesNotHaveExternalAvatarImageError,
     UsernameIsAlreadyTakenError,
+    UserNotFoundError,
     ValidationError,
 )
 from models.gender import Gender
@@ -31,6 +32,7 @@ from models.pagination import Pagination
 from models.role import Role
 from repositories.user_repository import UserRepositorty
 from services.file_service import FileService
+from services.tokens_service import TokensService
 from utils.image_utils import ImageUtils, PillowValidatationResult
 from utils.my_validator.my_validator import ValidateField, validate_request_body
 from utils.my_validator.rules import LengthRule
@@ -55,9 +57,9 @@ class UsersController:
     @authenticate()
     async def get_by_id(self, request: Request):
         user_id = request.match_info["user_id"]
-        user = await UserRepositorty.get_by_id(request.db_session, user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id, include_deleted=True)
         if user is None:
-            raise CouldNotFoundUserWithIdError(user_id)
+            raise UserNotFoundError(user_id)
         return json_response(data=user.to_json(safe=user_id == request.user_id))
 
     @authenticate()
@@ -101,7 +103,7 @@ class UsersController:
         ValidateField.about_me(required=False),
     )
     async def update_profile(self, request: Request):
-        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
         body: dict = request["validated_body"]
         fullname = body.get("fullname")
         username = body.get("username")
@@ -157,7 +159,7 @@ class UsersController:
     @content_type_is_json()
     @validate_request_body(ValidateField.password(field_name="new_password"))
     async def update_password(self, request: Request):
-        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
         body: dict = request["validated_body"]
         new_password = body.get("new_password")
         await UserRepositorty.update_password(request.db_session, user.id, new_password)
@@ -167,7 +169,7 @@ class UsersController:
     @authenticate()
     @content_type_is_multipart()
     async def update_avatar(self, request: Request):
-        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
         content_length = request.headers.get("Content-Length")
         try:
             int_length = int(content_length)
@@ -274,9 +276,9 @@ class UsersController:
     @authenticate()
     async def delete_avatar(self, request: Request):
         user_id = request.user_id
-        saved_user = await UserRepositorty.get_by_id(request.db_session, user_id)
+        saved_user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
         if not saved_user:
-            raise CouldNotFoundUserWithIdError(user_id)
+            raise UserNotFoundError(user_id)
         updated_user = await UserRepositorty.delete_avatar(request.db_session, user_id)
         await FileService.delete_avatar(user_id)
         self._logger.debug(f"@{saved_user.username} deleted avatar")
@@ -284,9 +286,9 @@ class UsersController:
 
     async def get_avatar_image(self, request: Request):
         user_id = request.match_info.get("user_id")
-        target_user = await UserRepositorty.get_by_id(request.db_session, user_id)
+        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
         if not target_user:
-            raise CouldNotFoundUserWithIdError(user_id)
+            raise UserNotFoundError(user_id)
         if not target_user.avatar_id or target_user.avatar_type != AvatarType.external:
             raise UserDoesNotHaveExternalAvatarImageError(target_user.username)
         avatar_file_path = await FileService.get_avatar_filepath(user_id)
@@ -311,7 +313,7 @@ class UsersController:
             request.db_session, user_id, target_id
         )
 
-        target_user = await UserRepositorty.get_by_id(request.db_session, target_id)
+        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, target_id)
         if target_user.current_sid:
             await self._sio.emit_new_follower(
                 target_sid=target_user.current_sid,
@@ -408,10 +410,12 @@ class UsersController:
         ValidateField.role(field_name="new_role")(new_role)
         new_role = Role(int(new_role))
         if new_role == Role.owner:
-            raise BadRequestError("You can not upgrade role to OWNER using this request")
-        target_user = await UserRepositorty.get_by_id(request.db_session, target_id)
+            raise BadRequestError(
+                "You can not upgrade role to OWNER using this request"
+            )
+        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, target_id)
         if not target_user:
-            raise CouldNotFoundUserWithIdError(target_id)
+            raise UserNotFoundError(target_id)
         if request.user_id == target_id:
             raise BadRequestError("You cannot update the role for youself")
         if not target_user.is_registration_completed:
@@ -427,3 +431,20 @@ class UsersController:
             f"OWNER({owner.username}) updated role for @{target_user.username} to ({new_role.name})"
         )
         return json_response()
+
+    @authenticate()
+    async def soft_delete(self, request: Request):
+        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        if user is None:
+            raise UserNotFoundError(request.user_id)
+        user_sid = user.current_sid
+        await UserRepositorty.soft_delete(
+            session=request.db_session, target_id=user.id
+        )
+        await self._sio.on_user_deleted(user_sid)
+        await TokensService.delete_all_by_user_id(
+            session=request.db_session, user_id=user.id
+        )
+        await request.db_session.commit()
+        self._logger.warning(f"User (@{user.username}) has been deleted (by himself)\n")
+        raise UnauthorizedError()

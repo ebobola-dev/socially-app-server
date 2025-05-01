@@ -269,11 +269,19 @@ class OtpCodeIsOutdatedError(BadRequestError):
         )
 
 
-class CouldNotFoundUserWithIdError(BadRequestError):
+class UserNotFoundError(BadRequestError):
     def __init__(self, user_id: str):
         super().__init__(
             server_message=f"Could not found user with id ({user_id})",
-            global_errors=[f"Could not found user with id ({user_id})"],
+            global_errors=["User not found"],
+        )
+
+
+class UserDeletedError(BadRequestError):
+    def __init__(self, user_id: str):
+        super().__init__(
+            server_message=f"User({user_id}) deleted",
+            global_errors=["User deleted"],
         )
 
 

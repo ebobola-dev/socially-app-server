@@ -69,7 +69,7 @@ class SioController(AsyncNamespace):
             token_data = TokensService.decode_access(access_token)
             user_id = token_data.get("id")
             user_role = token_data.get("role")
-            user = await UserRepositorty.get_by_id(
+            user = await UserRepositorty.get_by_id_with_relations(
                 session=db_session,
                 user_id=user_id,
             )
@@ -217,7 +217,11 @@ class SioController(AsyncNamespace):
                 return SioAck.failed().to_json()
 
     # * ------------------------ Emitters ------------------------
-    async def on_logout(self, user_sid: str):
+    async def on_logout(self, user_sid: str | None):
+        if user_sid:
+            await self.disconnect(user_sid)
+
+    async def on_user_deleted(self, user_sid: str | None):
         if user_sid:
             await self.disconnect(user_sid)
 

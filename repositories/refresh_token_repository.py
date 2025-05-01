@@ -74,6 +74,22 @@ class RefreshTokenRepository:
             raise DatabaseError(server_message=f"[RefreshToken | delete_one] {error}")
 
     @staticmethod
+    async def delete_all_by_user_id(
+        session: AsyncSession,
+        user_id: str,
+    ):
+        try:
+            await session.execute(
+                delete(RefreshToken).where(RefreshToken.user_id == user_id)
+            )
+            await session.flush()
+        except Exception as error:
+            await session.rollback()
+            raise DatabaseError(
+                server_message=f"[RefreshToken | delete_all_by_user_id] {error}"
+            )
+
+    @staticmethod
     async def delete_dead(
         session: AsyncSession,
     ) -> int:

@@ -98,7 +98,9 @@ class AuthConrtoller:
         if saved_refresh_token is None or saved_refresh_token.value != refresh_token:
             raise UnauthorizedError()
 
-        user = await UserRepositorty.get_by_id(request.db_session, user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+        if not user:
+            raise UnauthorizedError()
 
         (
             new_access_token,
@@ -123,7 +125,7 @@ class AuthConrtoller:
     @authenticate()
     @device_id_specified()
     async def logout(self, request: Request) -> Response:
-        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
         await self._sio.on_logout(user.current_sid)
         await UserRepositorty.set_current_sid(
             session=request.db_session,

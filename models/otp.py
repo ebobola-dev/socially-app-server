@@ -14,14 +14,14 @@ from utils.serialize_util import hide_email
 class Otp(BaseModel):
     __tablename__ = "otp"
 
-    id: Mapped[CHAR] = mapped_column(
+    id: Mapped[str] = mapped_column(
         CHAR(36),
         primary_key=True,
         default=lambda: str(uuid4()),
         unique=True,
         nullable=False,
     )
-    email_address: Mapped[String] = mapped_column(
+    email_address: Mapped[str] = mapped_column(
         String(320), unique=True, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -30,7 +30,7 @@ class Otp(BaseModel):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    value: Mapped[JSON] = mapped_column(
+    value: Mapped[list] = mapped_column(
         JSON, nullable=False, default=lambda: list(randint(0, 9) for _ in range(4))
     )
 
