@@ -171,7 +171,7 @@ class UserRepositorty:
                     ),
                     User.id != ignore_id,
                     User.is_registration_completed,
-                    User.is_deleted.is_(None),
+                    User.deleted_at.is_(None),
                 ),
             )
             .options(
