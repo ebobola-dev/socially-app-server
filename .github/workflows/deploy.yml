@@ -30,8 +30,5 @@ jobs:
       - name: Restart Services
         run: docker compose up -d --remove-orphans
 
-      - name: Applying database migrations
-        run: docker compose exec server alembic upgrade head
-
       - name: Clean up unused images
         run: docker image prune -af

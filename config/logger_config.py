@@ -35,7 +35,7 @@ class MyLoggerConfig:
             MyLoggerConfig.COLOR_HANDLER.setFormatter(
                 _MYFormatter(
                     "%(log_color)s%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-                    datefmt="%m.%d %H:%M:%S",
+                    datefmt="%d.%m %H:%M:%S",
                     log_colors={
                         "DEBUG": "purple",
                         "INFO": "cyan",

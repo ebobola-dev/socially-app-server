@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from config.database_config import DatabaseConfig
-from models.base import BaseModel
 from models.exceptions.initalize_exceptions import (
 	ConfigNotInitalizedButUsingError,
 	DatabaseNotInitializedError,
@@ -27,9 +26,9 @@ class Database:
 			if not DatabaseConfig.INITALIZED:
 				raise ConfigNotInitalizedButUsingError('DATABASE_CONFIG')
 			Database.engine = await Database.check_database_exists()
-			if await Database.is_database_empty():
-				async with Database.engine.begin() as connection:
-					await connection.run_sync(BaseModel.metadata.create_all)
+			# if await Database.is_database_empty():
+			# 	async with Database.engine.begin() as connection:
+			# 		await connection.run_sync(BaseModel.metadata.create_all)
 			Database.session_maker = async_sessionmaker(Database.engine, expire_on_commit=False)
 			Database.INITIALIZED = True
 		except Exception as error:
