@@ -1,12 +1,9 @@
-from random import randint
-from datetime import datetime
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.server_config import SERVER_CONFIG
 from models.apk_update import ApkUpdate
 from models.version_type import VersionType
-from models.exceptions.api_exceptions import *
+from models.exceptions.api_exceptions import DatabaseError
 
 class ApkUpdateRepository:
 	@staticmethod

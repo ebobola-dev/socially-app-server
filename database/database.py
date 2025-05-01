@@ -49,7 +49,7 @@ class Database:
 				result = await connection.execute(select([text('SHOW TABLES')]))
 				tables = await result.fetchall()
 				return len(tables) == 0
-		except:
+		except Exception as _:
 			return True
 
 	@staticmethod
@@ -60,6 +60,6 @@ class Database:
 			try:
 				await UserRepositorty.reset_sids(session)
 				await session.commit()
-			except Exception as error:
+			except Exception as _:
 				await session.rollback()
 				raise

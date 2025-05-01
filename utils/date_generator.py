@@ -1,7 +1,11 @@
 import random
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 
-def generate_date(start_date = datetime(1990, 1, 1), end_date = datetime(2025, 1, 1)) -> date:
+
+def generate_date(
+    start_date: datetime = datetime(1990, 1, 1),
+    end_date: datetime = datetime(2025, 1, 1),
+) -> date:
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
     if isinstance(end_date, str):

@@ -1,25 +1,25 @@
-import sys
 import asyncio
+import sys
+
 import socketio
 from aiohttp import web
 
-from config.server_config import SERVER_CONFIG
 from config.database_config import DATABASE_CONFIG
-from config.jwt_config import JWT_CONFIG
 from config.email_config import EMAIL_CONFIG
-from config.paths import PATHS
+from config.jwt_config import JWT_CONFIG
 from config.logger_config import MY_LOGGER_CONFIG
-
-from database.database import Database
+from config.paths import PATHS
+from config.server_config import SERVER_CONFIG
+from controllers.apk_update_controller import ApkUpdatesController
+from controllers.auth_conrtoller import AuthConrtoller
 from controllers.middlewares import Middlewares
 from controllers.registration_controller import RegistrationController
-from controllers.auth_conrtoller import AuthConrtoller
-from controllers.users_controller import UsersController
 from controllers.sio_controller import SioController
 from controllers.test_users_controller import TestUsersController
-from controllers.apk_update_controller import ApkUpdatesController
-
+from controllers.users_controller import UsersController
+from database.database import Database
 from services.test_users import TestUsers
+
 
 async def initialize():
 	SERVER_CONFIG.initialize() #! Must be called first (loaging env variables)
@@ -46,7 +46,7 @@ async def main():
 
 	try:
 		await Database.after_initialize()
-		server_logger.debug(f'User sids has been reset\n')
+		server_logger.debug('User sids has been reset\n')
 	except Exception as reset_sids_error:
 		server_logger.warning(f'Error on reset sids: {reset_sids_error}')
 
@@ -137,7 +137,8 @@ async def main():
 	await site.start()
 	server_logger.info(f'Server started on {SERVER_CONFIG.HOST}:{SERVER_CONFIG.PORT}...\n')
 
-	while True: await asyncio.sleep(3600)
+	while True:
+		await asyncio.sleep(3600)
 
 def run_server():
 	if sys.platform != "win32":

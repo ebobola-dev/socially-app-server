@@ -1,6 +1,7 @@
 import random
 import string
 
+
 def generate_password():
     lowercase_letters = string.ascii_lowercase
     uppercase_letters = string.ascii_uppercase
@@ -16,4 +17,4 @@ def generate_password():
     for _ in range(password_length - 3):
         password.append(random.choice(all_characters))
     random.shuffle(password)
-    return ''.join(password)
+    return "".join(password)

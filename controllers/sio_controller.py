@@ -88,7 +88,7 @@ class SioController(AsyncNamespace):
 			)
 		except ExpiredSignatureError:
 			raise AuthorizeError(
-				internal_message = f"Access token has expired",
+				internal_message = "Access token has expired",
 				ack_message = 'Token has expired',
 			)
 		except PyJWTError as decoding_error:

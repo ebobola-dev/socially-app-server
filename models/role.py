@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Role(Enum):
 	user = 1
 	admin = 2
