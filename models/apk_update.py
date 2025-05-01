@@ -1,11 +1,12 @@
-from uuid import uuid4
-from sqlalchemy import CHAR, DateTime, String, Integer, JSON
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+from uuid import uuid4
 
-from utils.sizes import SizeUtils
+from sqlalchemy import CHAR, JSON, DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
 from models.base import BaseModel
 from models.version_type import VersionType
+from utils.sizes import SizeUtils
 
 
 class ApkUpdate(BaseModel):

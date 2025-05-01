@@ -4,12 +4,12 @@ import sys
 import socketio
 from aiohttp import web
 
-from config.database_config import DATABASE_CONFIG
-from config.email_config import EMAIL_CONFIG
-from config.jwt_config import JWT_CONFIG
-from config.logger_config import MY_LOGGER_CONFIG
-from config.paths import PATHS
-from config.server_config import SERVER_CONFIG
+from config.database_config import DatabaseConfig
+from config.email_config import EmailConfig
+from config.jwt_config import JwtConfig
+from config.logger_config import MyLoggerConfig
+from config.paths import Paths
+from config.server_config import ServerConfig
 from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
 from controllers.middlewares import Middlewares
@@ -22,11 +22,11 @@ from services.test_users import TestUsers
 
 
 async def initialize():
-	SERVER_CONFIG.initialize() #! Must be called first (loaging env variables)
-	DATABASE_CONFIG.initialize()
-	JWT_CONFIG.initialize()
-	EMAIL_CONFIG.initialize()
-	MY_LOGGER_CONFIG.initialize()
+	ServerConfig.initialize() #! Must be called first (loaging env variables)
+	DatabaseConfig.initialize()
+	JwtConfig.initialize()
+	EmailConfig.initialize()
+	MyLoggerConfig.initialize()
 	await Database.initialize()
 
 async def main():
@@ -34,7 +34,7 @@ async def main():
 
 	from services.my_logger import MyLogger
 	server_logger = MyLogger.get_logger('Server')
-	server_logger.info(f'Initialized with logging level: {MY_LOGGER_CONFIG.LEVEL}, run in docker: {SERVER_CONFIG.RUN_IN_DOCKER}\n')
+	server_logger.info(f'Initialized with logging level: {MyLoggerConfig.LEVEL}, run in docker: {ServerConfig.RUN_IN_DOCKER}\n')
 
 	try:
 		test_users_service = TestUsers(
@@ -87,38 +87,38 @@ async def main():
 	)
 
 	app.add_routes([
-		web.post(PATHS.REGISTRATION.CHECK_EMAIL, registration_controller.check_email),
-		web.post(PATHS.REGISTRATION.VERIFY_OTP, registration_controller.check_otp),
-		web.put(PATHS.REGISTRATION.COMPLETE_REGISTRATION, registration_controller.complete_registration),
+		web.post(Paths.Registration.CHECK_EMAIL, registration_controller.check_email),
+		web.post(Paths.Registration.VERIFY_OTP, registration_controller.check_otp),
+		web.put(Paths.Registration.COMPLETE_REGISTRATION, registration_controller.complete_registration),
 
-		web.post(PATHS.AUTH.LOGIN, auth_controller.login),
-		web.post(PATHS.AUTH.RESET_PASSWORD.SEND_OTP, auth_controller.send_otp_to_reset_password),
-		web.post(PATHS.AUTH.RESET_PASSWORD.VERIFY_OTP, auth_controller.verify_otp_for_reset_password),
-		web.post(PATHS.AUTH.REFRESH, auth_controller.refresh),
-		web.put(PATHS.AUTH.LOGOUT, auth_controller.logout),
+		web.post(Paths.Auth.LOGIN, auth_controller.login),
+		web.post(Paths.Auth.ResetPassword.SEND_OTP, auth_controller.send_otp_to_reset_password),
+		web.post(Paths.Auth.ResetPassword.VERIFY_OTP, auth_controller.verify_otp_for_reset_password),
+		web.post(Paths.Auth.REFRESH, auth_controller.refresh),
+		web.put(Paths.Auth.LOGOUT, auth_controller.logout),
 
-		web.get(PATHS.USERS.CHECK_USERNAME, users_controller.check_username),
-		web.get(PATHS.USERS.GET_BY_ID, users_controller.get_by_id),
-		web.get(PATHS.USERS.SEARCH, users_controller.search),
-		web.put(PATHS.USERS.UPDATE_PROFILE, users_controller.update_profile),
-		web.put(PATHS.USERS.UPDATE_PASSWORD, users_controller.update_password),
-		web.put(PATHS.USERS.UPDATE_AVATAR, users_controller.update_avatar),
-		web.delete(PATHS.USERS.DELETE_AVATAR, users_controller.delete_avatar),
-		web.get(PATHS.USERS.GET_AVATAR_IMAGE, users_controller.get_avatar_image),
-		web.put(PATHS.USERS.FOLLOW, users_controller.follow),
-		web.delete(PATHS.USERS.UNFOLLOW, users_controller.unfollow),
-		web.get(PATHS.USERS.GET_FOLLOWINGS, users_controller.get_followings),
-		web.get(PATHS.USERS.GET_FOLLOWERS, users_controller.get_followers),
-		web.put(PATHS.USERS.UPDATE_ROLE, users_controller.update_role),
+		web.get(Paths.Users.CHECK_USERNAME, users_controller.check_username),
+		web.get(Paths.Users.GET_BY_ID, users_controller.get_by_id),
+		web.get(Paths.Users.SEARCH, users_controller.search),
+		web.put(Paths.Users.UPDATE_PROFILE, users_controller.update_profile),
+		web.put(Paths.Users.UPDATE_PASSWORD, users_controller.update_password),
+		web.put(Paths.Users.UPDATE_AVATAR, users_controller.update_avatar),
+		web.delete(Paths.Users.DELETE_AVATAR, users_controller.delete_avatar),
+		web.get(Paths.Users.GET_AVATAR_IMAGE, users_controller.get_avatar_image),
+		web.put(Paths.Users.FOLLOW, users_controller.follow),
+		web.delete(Paths.Users.UNFOLLOW, users_controller.unfollow),
+		web.get(Paths.Users.GET_FOLLOWINGS, users_controller.get_followings),
+		web.get(Paths.Users.GET_FOLLOWERS, users_controller.get_followers),
+		web.put(Paths.Users.UPDATE_ROLE, users_controller.update_role),
 
-		web.get(PATHS.TEST_USERS.ADMIN_ROLE_TEST, test_users_controller.test_admin_role),
-		web.get(PATHS.TEST_USERS.OWNER_ROLE_TEST, test_users_controller.test_owner_role),
+		web.get(Paths.TestUsers.ADMIN_ROLE_TEST, test_users_controller.test_admin_role),
+		web.get(Paths.TestUsers.OWNER_ROLE_TEST, test_users_controller.test_owner_role),
 
-		web.post(PATHS.APK_UPDATES.ADD, apk_updates_controller.add),
-		web.get(PATHS.APK_UPDATES.GET_ONE, apk_updates_controller.get_one),
-		web.get(PATHS.APK_UPDATES.GET_MANY, apk_updates_controller.get_many),
-		web.get(PATHS.APK_UPDATES.DOWNLOAD, apk_updates_controller.download),
-		web.delete(PATHS.APK_UPDATES.DELETE, apk_updates_controller.delete),
+		web.post(Paths.ApkUpdates.ADD, apk_updates_controller.add),
+		web.get(Paths.ApkUpdates.GET_ONE, apk_updates_controller.get_one),
+		web.get(Paths.ApkUpdates.GET_MANY, apk_updates_controller.get_many),
+		web.get(Paths.ApkUpdates.DOWNLOAD, apk_updates_controller.download),
+		web.delete(Paths.ApkUpdates.DELETE, apk_updates_controller.delete),
 	])
 
 	from services.background_services import BackgroundServices
@@ -130,12 +130,12 @@ async def main():
 
 	site = web.TCPSite(
 		runner,
-		host=SERVER_CONFIG.HOST,
-		port=SERVER_CONFIG.PORT,
+		host=ServerConfig.HOST,
+		port=ServerConfig.PORT,
 	)
 
 	await site.start()
-	server_logger.info(f'Server started on {SERVER_CONFIG.HOST}:{SERVER_CONFIG.PORT}...\n')
+	server_logger.info(f'Server started on {ServerConfig.HOST}:{ServerConfig.PORT}...\n')
 
 	while True:
 		await asyncio.sleep(3600)

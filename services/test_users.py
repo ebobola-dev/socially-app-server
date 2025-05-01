@@ -1,12 +1,13 @@
 import json
 from logging import Logger
 from typing import Iterable
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.database import Database
+from models.avatar_type import AvatarType
 from models.gender import Gender
 from models.role import Role
-from models.avatar_type import AvatarType
 from repositories.user_repository import UserRepositorty
 from utils.date_generator import generate_date
 from utils.password_generator import generate_password
@@ -18,7 +19,7 @@ class TestUsers:
         self._test_users_file = test_users_file
 
     def _get_test_users_data(self):
-        with open(self._test_users_file, "r", encoding="utf-8") as file:
+        with open(self._test_users_file, encoding="utf-8") as file:
             return json.load(file)
 
     async def _check_user_exist(self, session: AsyncSession, email):

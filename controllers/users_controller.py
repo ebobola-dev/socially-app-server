@@ -6,8 +6,8 @@ from uuid import uuid4
 
 from aiohttp.web import FileResponse, Request, json_response
 
-from config.length_requirements import LENGTH_REQIREMENTS
-from config.server_config import SERVER_CONFIG
+from config.length_requirements import LengthRequirements
+from config.server_config import ServerConfig
 from controllers.middlewares import (
     authenticate,
     content_type_is_json,
@@ -17,14 +17,14 @@ from controllers.middlewares import (
 from controllers.sio_controller import SioController
 from models.avatar_type import AvatarType
 from models.exceptions.api_exceptions import (
-    BadRequest,
+    BadImageFileExtError,
+    BadRequestError,
+    CouldNotFoundUserWithIdError,
+    ImageIsTooLargeError,
+    NothingToUpdateError,
+    UserDoesNotHaveExternalAvatarImageError,
+    UsernameIsAlreadyTakenError,
     ValidationError,
-    CouldNotFoundUserWithId,
-    UsernameIsAlreadyTaken,
-    NothingToUpdate,
-    BadImageFileExt,
-    ImageIsTooLarge,
-    UserDoesNotHaveExternalAvatarImage,
 )
 from models.gender import Gender
 from models.pagination import Pagination
@@ -57,7 +57,7 @@ class UsersController:
         user_id = request.match_info["user_id"]
         user = await UserRepositorty.get_by_id(request.db_session, user_id)
         if user is None:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         return json_response(data=user.to_json(safe=user_id == request.user_id))
 
     @authenticate()
@@ -67,7 +67,7 @@ class UsersController:
         ValidateField(
             field_name="search_data",
             nullable=False,
-            rules=[LengthRule(max_length=LENGTH_REQIREMENTS.FULLNAME.MAX)],
+            rules=[LengthRule(max_length=LengthRequirements.Fullname.MAX)],
         )(search_data)
         search_data = search_data.strip()
 
@@ -120,7 +120,7 @@ class UsersController:
                 request.db_session, username
             )
             if user_with_username:
-                raise UsernameIsAlreadyTaken(username)
+                raise UsernameIsAlreadyTakenError(username)
             new_data["username"] = username
 
         if gender:
@@ -141,7 +141,7 @@ class UsersController:
             new_data["about_me"] = about_me
 
         if not new_data:
-            raise NothingToUpdate(
+            raise NothingToUpdateError(
                 server_message=f"nothing to update, new_data: {new_data}",
             )
 
@@ -199,15 +199,15 @@ class UsersController:
                     if (
                         not file_ext
                         or file_ext == "."
-                        or file_ext[1:] not in SERVER_CONFIG.ALLOWED_IMAGE_EXTENSIONS
+                        or file_ext[1:] not in ServerConfig.ALLOWED_IMAGE_EXTENSIONS
                     ):
-                        raise BadImageFileExt(file_ext)
+                        raise BadImageFileExtError(file_ext)
                     avatar_file_buffer = BytesIO()
                     total_size = 0
                     while chunk := await part.read_chunk(4096):
                         total_size += len(chunk)
-                        if total_size > SERVER_CONFIG.MAX_IMAGE_SIZE * 1024 * 1024:
-                            raise ImageIsTooLarge(content_length)
+                        if total_size > ServerConfig.MAX_IMAGE_SIZE * 1024 * 1024:
+                            raise ImageIsTooLargeError(content_length)
                         avatar_file_buffer.write(chunk)
                     avatar_file_buffer.seek(0)
                 case "avatar_type":
@@ -276,7 +276,7 @@ class UsersController:
         user_id = request.user_id
         saved_user = await UserRepositorty.get_by_id(request.db_session, user_id)
         if not saved_user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         updated_user = await UserRepositorty.delete_avatar(request.db_session, user_id)
         await FileService.delete_avatar(user_id)
         self._logger.debug(f"@{saved_user.username} deleted avatar")
@@ -286,15 +286,15 @@ class UsersController:
         user_id = request.match_info.get("user_id")
         target_user = await UserRepositorty.get_by_id(request.db_session, user_id)
         if not target_user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         if not target_user.avatar_id or target_user.avatar_type != AvatarType.external:
-            raise UserDoesNotHaveExternalAvatarImage(target_user.username)
+            raise UserDoesNotHaveExternalAvatarImageError(target_user.username)
         avatar_file_path = await FileService.get_avatar_filepath(user_id)
         if avatar_file_path is None:
             self._logger.warning(
                 f"Unable to find avatar file path for @{target_user.username}, but its exists in database"
             )
-            raise UserDoesNotHaveExternalAvatarImage(target_user.username)
+            raise UserDoesNotHaveExternalAvatarImageError(target_user.username)
         return FileResponse(avatar_file_path)
 
     @authenticate()
@@ -408,14 +408,14 @@ class UsersController:
         ValidateField.role(field_name="new_role")(new_role)
         new_role = Role(int(new_role))
         if new_role == Role.owner:
-            raise BadRequest("You can not upgrade role to OWNER using this request")
+            raise BadRequestError("You can not upgrade role to OWNER using this request")
         target_user = await UserRepositorty.get_by_id(request.db_session, target_id)
         if not target_user:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         if request.user_id == target_id:
-            raise BadRequest("You cannot update the role for youself")
+            raise BadRequestError("You cannot update the role for youself")
         if not target_user.is_registration_completed:
-            raise BadRequest("The target user has not completed registration yet")
+            raise BadRequestError("The target user has not completed registration yet")
         # * End validation
         await UserRepositorty.update_role(
             request.db_session,

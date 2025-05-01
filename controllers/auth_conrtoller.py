@@ -10,11 +10,11 @@ from controllers.middlewares import (
 )
 from controllers.sio_controller import SioController
 from models.exceptions.api_exceptions import (
-    CouldNotFoundUserWithSpecifiedData,
-    CouldNotSendOtpToEmail,
-    IncorrectLoginData,
-    OtpSpam,
-    TryingToResetPasswordWithIncompletedRegistration,
+    CouldNotFoundUserWithSpecifiedDataError,
+    CouldNotSendOtpToEmailError,
+    IncorrectLoginDataError,
+    OtpSpamError,
+    TryingToResetPasswordWithIncompletedRegistrationError,
     UnauthorizedError,
     ValidationError,
 )
@@ -45,12 +45,12 @@ class AuthConrtoller:
 
         user = await UserRepositorty.get_by_username(request.db_session, username)
         if user is None:
-            raise IncorrectLoginData(
+            raise IncorrectLoginDataError(
                 server_message=f"Could not found user with username @{username}"
             )
 
         if not checkpw(password.encode("UTF-8"), user.hashed_password):
-            raise IncorrectLoginData(
+            raise IncorrectLoginDataError(
                 server_message=f"@{username} gave incorrect password"
             )
 
@@ -169,14 +169,14 @@ class AuthConrtoller:
             specified_data = username
 
         if user is None:
-            raise CouldNotFoundUserWithSpecifiedData(specified_data)
+            raise CouldNotFoundUserWithSpecifiedDataError(specified_data)
 
         if not user.is_registration_completed:
-            raise TryingToResetPasswordWithIncompletedRegistration()
+            raise TryingToResetPasswordWithIncompletedRegistrationError()
 
         # * Checking for spam to OTP generation
         if not (await OtpRepository.can_update(request.db_session, user.email_address)):
-            raise OtpSpam(user.email_address)
+            raise OtpSpamError(user.email_address)
 
         # * Updating user OTP
         otp = await OtpRepository.create_or_update(
@@ -190,7 +190,7 @@ class AuthConrtoller:
                 user.email_address, otp.value, OtpDestiny.reset_password
             )
         except Exception:
-            raise CouldNotSendOtpToEmail(user.email_address)
+            raise CouldNotSendOtpToEmailError(user.email_address)
 
         return json_response(data=otp.to_json(safe=reset_type == "e"))
 
@@ -229,7 +229,7 @@ class AuthConrtoller:
             specified_data = username
 
         if user is None:
-            raise CouldNotFoundUserWithSpecifiedData(specified_data)
+            raise CouldNotFoundUserWithSpecifiedDataError(specified_data)
 
         body = request["validated_body"]
         otp_code = body.get("otp_code")

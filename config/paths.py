@@ -1,25 +1,25 @@
 _base_api_path = "/api/v1"
 
 
-class PATHS:
-    class REGISTRATION:
+class Paths:
+    class Registration:
         _base_path = f"{_base_api_path}/registration"
         CHECK_EMAIL = f"{_base_path}"
         VERIFY_OTP = f"{_base_path}/verify_otp"
         COMPLETE_REGISTRATION = f"{_base_path}/complete"
 
-    class AUTH:
+    class Auth:
         _base_path = f"{_base_api_path}/auth"
         LOGIN = f"{_base_path}/login"
         LOGOUT = f"{_base_path}/logout"
         REFRESH = f"{_base_path}/refresh"
 
-        class RESET_PASSWORD:
+        class ResetPassword:
             _base_path = f"{_base_api_path}/auth/reset_password"
             SEND_OTP = f"{_base_path}"
             VERIFY_OTP = f"{_base_path}/verify_otp"
 
-    class USERS:
+    class Users:
         _base_path = f"{_base_api_path}/users"
         CHECK_USERNAME = f"{_base_path}/check_username"
         GET_BY_ID = f"{_base_path}/{{user_id}}"
@@ -35,12 +35,12 @@ class PATHS:
         GET_FOLLOWERS = f"{_base_path}/followers"
         UPDATE_ROLE = f"{_base_path}/update_role"
 
-    class TEST_USERS:
+    class TestUsers:
         _base_path = f"{_base_api_path}/test_users"
         ADMIN_ROLE_TEST = f"{_base_path}/admin_role"
         OWNER_ROLE_TEST = f"{_base_path}/owner_role"
 
-    class APK_UPDATES:
+    class ApkUpdates:
         _base_path = f"{_base_api_path}/apk_updates"
         GET_MANY = f"{_base_path}"
         ADD = f"{_base_path}/add"

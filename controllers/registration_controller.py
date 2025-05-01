@@ -1,30 +1,30 @@
-from logging import Logger
 from datetime import date
+from logging import Logger
+
 from aiohttp.web import Request, json_response
 
-from config.server_config import SERVER_CONFIG
-from models.gender import Gender
-from models.otp import OtpDestiny
-from models.exceptions.api_exceptions import (
-    ValidationError,
-    UserWithEmailHasAlreadyCompletedRegistration,
-    CouldNotSendOtpToEmail,
-    OtpSpam,
-    CouldNotFoundUserWithId,
-    UsernameIsAlreadyTaken,
-)
-from models.role import Role
-
+from config.server_config import ServerConfig
 from controllers.middlewares import (
     authenticate,
     content_type_is_json,
     device_id_specified,
 )
-from utils.my_validator.my_validator import validate_request_body, ValidateField
-from services.email_service import EmailService
-from services.tokens_service import TokensService
+from models.exceptions.api_exceptions import (
+    CouldNotFoundUserWithIdError,
+    CouldNotSendOtpToEmailError,
+    OtpSpamError,
+    UsernameIsAlreadyTakenError,
+    UserWithEmailHasAlreadyCompletedRegistrationError,
+    ValidationError,
+)
+from models.gender import Gender
+from models.otp import OtpDestiny
+from models.role import Role
 from repositories.otp_repository import OtpRepository
 from repositories.user_repository import UserRepositorty
+from services.email_service import EmailService
+from services.tokens_service import TokensService
+from utils.my_validator.my_validator import ValidateField, validate_request_body
 
 
 class RegistrationController:
@@ -40,12 +40,12 @@ class RegistrationController:
 
         # * Checking for spam to OTP generation
         if not (await OtpRepository.can_update(request.db_session, email)):
-            raise OtpSpam(email)
+            raise OtpSpamError(email)
 
         # * Check user exists
         user = await UserRepositorty.get_by_email(request.db_session, email)
         if user is not None and user.is_registration_completed:
-            raise UserWithEmailHasAlreadyCompletedRegistration(email_address=email)
+            raise UserWithEmailHasAlreadyCompletedRegistrationError(email_address=email)
 
         # * Creating and saving OTP
         otp = await OtpRepository.create_or_update(request.db_session, email)
@@ -55,7 +55,7 @@ class RegistrationController:
         try:
             await EmailService.send_otp(email, otp.value, OtpDestiny.registration)
         except Exception as email_error:
-            raise CouldNotSendOtpToEmail(email, email_error)
+            raise CouldNotSendOtpToEmailError(email, email_error)
 
         return json_response(data=otp.to_json(safe=True))
 
@@ -73,7 +73,7 @@ class RegistrationController:
         # * Check user with registration completed
         user = await UserRepositorty.get_by_email(request.db_session, email)
         if user is not None and user.is_registration_completed:
-            raise UserWithEmailHasAlreadyCompletedRegistration(email_address=email)
+            raise UserWithEmailHasAlreadyCompletedRegistrationError(email_address=email)
 
         otp_code = body.get("otp_code")
 
@@ -87,8 +87,8 @@ class RegistrationController:
             new_user_role = Role.user
             if (
                 owner_key
-                and SERVER_CONFIG.OWNER_KEY
-                and SERVER_CONFIG.OWNER_KEY == owner_key
+                and ServerConfig.OWNER_KEY
+                and ServerConfig.OWNER_KEY == owner_key
             ):
                 new_user_role = Role.owner
             user = await UserRepositorty.create_new(
@@ -100,8 +100,8 @@ class RegistrationController:
             if user.role != Role.owner:
                 if (
                     owner_key
-                    and SERVER_CONFIG.OWNER_KEY
-                    and SERVER_CONFIG.OWNER_KEY == owner_key
+                    and ServerConfig.OWNER_KEY
+                    and ServerConfig.OWNER_KEY == owner_key
                 ):
                     user = await UserRepositorty.update_role(
                         request.db_session,
@@ -165,16 +165,16 @@ class RegistrationController:
 
         user = await UserRepositorty.get_by_id(request.db_session, user_id)
         if user is None:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         if user is not None and user.is_registration_completed:
-            raise UserWithEmailHasAlreadyCompletedRegistration(user.email_address)
+            raise UserWithEmailHasAlreadyCompletedRegistrationError(user.email_address)
 
         # * Check username is unique
         if (
             await UserRepositorty.get_by_username(request.db_session, username)
             is not None
         ):
-            raise UsernameIsAlreadyTaken(username)
+            raise UsernameIsAlreadyTakenError(username)
 
         # * Completing registration
         updated_user = await UserRepositorty.complete_registration(

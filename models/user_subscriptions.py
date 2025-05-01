@@ -1,4 +1,4 @@
-from sqlalchemy import Table, CHAR, ForeignKey, Column
+from sqlalchemy import CHAR, Column, ForeignKey, Table
 
 from models.base import BaseModel
 

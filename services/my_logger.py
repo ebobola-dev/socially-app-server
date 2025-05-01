@@ -1,17 +1,18 @@
-import colorlog
 from logging import Logger
 
-from config.logger_config import MY_LOGGER_CONFIG
-from models.exceptions.initalize_exceptions import ConfigNotInitalizedButUsing
+import colorlog
+
+from config.logger_config import MyLoggerConfig
+from models.exceptions.initalize_exceptions import ConfigNotInitalizedButUsingError
 
 
 class MyLogger:
     @staticmethod
-    def get_logger(name: str, level: str | int = MY_LOGGER_CONFIG.LEVEL) -> Logger:
-        if not MY_LOGGER_CONFIG.INITALIZED:
-            raise ConfigNotInitalizedButUsing("MY_LOGGER_CONFIG")
+    def get_logger(name: str, level: str | int = MyLoggerConfig.LEVEL) -> Logger:
+        if not MyLoggerConfig.INITALIZED:
+            raise ConfigNotInitalizedButUsingError("MY_LOGGER_CONFIG")
         logger = colorlog.getLogger(name)
-        logger.addHandler(MY_LOGGER_CONFIG.COLOR_HANDLER)
+        logger.addHandler(MyLoggerConfig.COLOR_HANDLER)
         logger.propagate = False
         logger.setLevel(level)
         return logger

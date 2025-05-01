@@ -1,11 +1,12 @@
 import asyncio
-from aiohttp.web import Application
 from datetime import datetime, timedelta, timezone
 
-from repositories.otp_repository import OtpRepository
-from services.tokens_service import TokensService
-from services.my_logger import MyLogger
+from aiohttp.web import Application
+
 from database.database import Database
+from repositories.otp_repository import OtpRepository
+from services.my_logger import MyLogger
+from services.tokens_service import TokensService
 from utils.datetime_utils import DateTimeUtils
 
 

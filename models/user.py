@@ -1,27 +1,30 @@
+from datetime import datetime
 from uuid import uuid4
+
 from sqlalchemy import (
-    String,
-    Enum as SqlAlchemyEnum,
     BINARY,
-    DATE,
     BOOLEAN,
     CHAR,
+    DATE,
     DateTime,
+    String,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
-from datetime import datetime
+from sqlalchemy import (
+    Enum as SqlAlchemyEnum,
+)
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
+from models.avatar_type import AvatarType
 from models.base import (
     BaseModel,
-    safe_fields,
+    allowed_to_update_fields,
     protected_from_json_fields,
     relationship_fields,
+    safe_fields,
     short_fields,
-    allowed_to_update_fields,
 )
 from models.gender import Gender
 from models.role import Role
-from models.avatar_type import AvatarType
 from models.user_subscriptions import user_subscriptions
 
 

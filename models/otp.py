@@ -1,9 +1,10 @@
-from uuid import uuid4
 from datetime import datetime, timezone
-from sqlalchemy import String, CHAR, DateTime, JSON
-from sqlalchemy.orm import Mapped, mapped_column
-from random import randint
 from enum import Enum
+from random import randint
+from uuid import uuid4
+
+from sqlalchemy import CHAR, JSON, DateTime, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import BaseModel, protected_from_json_fields
 from utils.serialize_util import hide_email

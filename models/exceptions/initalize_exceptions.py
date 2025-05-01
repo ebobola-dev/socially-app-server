@@ -3,33 +3,33 @@ class InitializeError(Exception):
         super().__init__(*args)
 
 
-class ServerConfigNotInitialized(InitializeError):
+class ServerConfigNotInitializedError(InitializeError):
     def __init__(self):
         super().__init__("Server Config must be initialized first")
 
 
-class UnableToGetEnvVariable(InitializeError):
+class UnableToGetEnvVariableError(InitializeError):
     def __init__(self, variables: tuple[str]):
         super().__init__(f"Unable to get the Env variables: {variables}")
 
 
-class UnableToInitializeService(InitializeError):
+class UnableToInitializeServiceError(InitializeError):
     def __init__(self, service_name: str):
         super().__init__(f"Unable to initialize [{service_name}]")
 
 
-class ConfigNotInitalizedButUsing(InitializeError):
+class ConfigNotInitalizedButUsingError(InitializeError):
     def __init__(self, config_name: str):
         super().__init__(
             f"Config [{config_name}] has not been initialized, but is being used"
         )
 
 
-class UnableToInitalizeDatabase(InitializeError):
+class UnableToInitalizeDatabaseError(InitializeError):
     def __init__(self):
         super().__init__("Unable to initalize database")
 
 
-class DatabaseNotInitialized(InitializeError):
+class DatabaseNotInitializedError(InitializeError):
     def __init__(self):
         super().__init__("Database has not beed initialized, but is being user")

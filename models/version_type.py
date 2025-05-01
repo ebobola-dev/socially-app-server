@@ -1,5 +1,5 @@
-from sqlalchemy.types import TypeDecorator, String
 from packaging.version import Version
+from sqlalchemy.types import String, TypeDecorator
 
 
 class VersionType(TypeDecorator):

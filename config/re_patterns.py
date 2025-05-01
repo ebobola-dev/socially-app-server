@@ -1,4 +1,4 @@
-class RE_PATTERNS:
+class RePatterns:
     EMAIL = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     USERNAME = r"^(?![0-9])(?!\d+$)(?!\.)[a-z0-9_.]{4,16}$"
     PASSWORD = r"^(?=.*[a-zA-Z])(?=.*\d).{8,16}$"

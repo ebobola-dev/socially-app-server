@@ -1,9 +1,10 @@
-from sqlalchemy import select, delete
 from datetime import datetime
+
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.refresh_token import RefreshToken
 from models.exceptions.api_exceptions import DatabaseError
+from models.refresh_token import RefreshToken
 
 
 class RefreshTokenRepository:

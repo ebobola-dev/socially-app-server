@@ -1,26 +1,27 @@
-import bcrypt
-from sqlalchemy import select, or_, and_, update
-from sqlalchemy.orm import selectinload
 from datetime import date, datetime, timezone
 
-from config.server_config import SERVER_CONFIG
+import bcrypt
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from config.server_config import ServerConfig
+from models.avatar_type import AvatarType
+from models.exceptions.api_exceptions import (
+    AlreadyFollowingError,
+    CantFollowUnlollowYouselfError,
+    CouldNotFoundUserWithIdError,
+    DatabaseError,
+    NotFollowingAnywayError,
+    NothingToUpdateError,
+    OwnerAlreadyRegisteredError,
+    UserWithEmailHasAlreadyCompletedRegistrationError,
+)
+from models.gender import Gender
+from models.pagination import Pagination
+from models.role import Role
 from models.user import User
 from models.user_subscriptions import user_subscriptions
-from models.gender import Gender
-from models.avatar_type import AvatarType
-from models.role import Role
-from models.exceptions.api_exceptions import (
-    AlreadyFollowing,
-    CantFollowUnlollowYouself,
-    CouldNotFoundUserWithId,
-    DatabaseError,
-    NotFollowingAnyway,
-    NothingToUpdate,
-    OwnerAlreadyRegistered,
-    UserWithEmailHasAlreadyCompletedRegistration,
-)
-from models.pagination import Pagination
 
 
 class UserRepositorty:
@@ -70,7 +71,7 @@ class UserRepositorty:
         if role == Role.owner:
             existing_owner = await UserRepositorty.get_owner(session)
             if existing_owner:
-                raise OwnerAlreadyRegistered()
+                raise OwnerAlreadyRegisteredError()
         new_user = User.new(email, role)
         session.add(new_user)
         try:
@@ -165,10 +166,10 @@ class UserRepositorty:
     ) -> User:
         user: User | None = await session.get(User, user_id)
         if user is None:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         user.hashed_password = bcrypt.hashpw(
             new_password.encode(),
-            salt=bcrypt.gensalt(rounds=SERVER_CONFIG.BCRYPT_SALT_ROUNDS),
+            salt=bcrypt.gensalt(rounds=ServerConfig.BCRYPT_SALT_ROUNDS),
         )
         try:
             await session.flush()
@@ -181,15 +182,15 @@ class UserRepositorty:
     @staticmethod
     async def follow(session: AsyncSession, subscriber_id: str, target_id: str) -> User:
         if subscriber_id == target_id:
-            raise CantFollowUnlollowYouself()
+            raise CantFollowUnlollowYouselfError()
         subscriber = await session.get(User, subscriber_id)
         target = await session.get(User, target_id)
         if not subscriber:
-            raise CouldNotFoundUserWithId(subscriber_id)
+            raise CouldNotFoundUserWithIdError(subscriber_id)
         if not target:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         if target in await subscriber.awaitable_attrs.following:
-            raise AlreadyFollowing(
+            raise AlreadyFollowingError(
                 sub_username=subscriber.username,
                 target_username=target.username,
             )
@@ -207,15 +208,15 @@ class UserRepositorty:
         session: AsyncSession, subscriber_id: str, target_id: str
     ) -> User:
         if subscriber_id == target_id:
-            raise CantFollowUnlollowYouself()
+            raise CantFollowUnlollowYouselfError()
         subscriber = await session.get(User, subscriber_id)
         target = await session.get(User, target_id)
         if not subscriber:
-            raise CouldNotFoundUserWithId(subscriber_id)
+            raise CouldNotFoundUserWithIdError(subscriber_id)
         if not target:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         if target not in await subscriber.awaitable_attrs.following:
-            raise NotFollowingAnyway(
+            raise NotFollowingAnywayError(
                 sub_username=subscriber.username,
                 target_username=target.username,
             )
@@ -245,13 +246,13 @@ class UserRepositorty:
             about_me = ""
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         if user.is_registration_completed:
-            raise UserWithEmailHasAlreadyCompletedRegistration(user.email_address)
+            raise UserWithEmailHasAlreadyCompletedRegistrationError(user.email_address)
         user.username = username
         user.hashed_password = bcrypt.hashpw(
             password.encode(),
-            salt=bcrypt.gensalt(rounds=SERVER_CONFIG.BCRYPT_SALT_ROUNDS),
+            salt=bcrypt.gensalt(rounds=ServerConfig.BCRYPT_SALT_ROUNDS),
         )
         user.fullname = fullname
         user.date_of_birth = date_of_birth
@@ -277,7 +278,7 @@ class UserRepositorty:
     ) -> User:
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         user.avatar_type = new_avatar_type
         user.avatar_id = new_avatar_id
         try:
@@ -292,7 +293,7 @@ class UserRepositorty:
     async def delete_avatar(session: AsyncSession, user_id: str) -> User:
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         user.avatar_type = None
         user.avatar_id = None
         try:
@@ -309,7 +310,7 @@ class UserRepositorty:
     ) -> User:
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         if user.is_online and not new_is_online_value:
             user.last_seen = datetime.now(timezone.utc)
         user.is_online = new_is_online_value
@@ -327,7 +328,7 @@ class UserRepositorty:
     ) -> User:
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         if not new_sid:
             await UserRepositorty.toggle_online(session, user_id, False)
         user.current_sid = new_sid
@@ -347,12 +348,12 @@ class UserRepositorty:
             if key in User.allowed_to_update_fields
         }
         if not new_data:
-            raise NothingToUpdate(
+            raise NothingToUpdateError(
                 server_message=f"nothing to update, {update_data} -> {new_data}",
             )
         user: User = await session.get(User, user_id)
         if not user:
-            raise CouldNotFoundUserWithId(user_id)
+            raise CouldNotFoundUserWithIdError(user_id)
         for field, value in new_data.items():
             setattr(user, field, value)
         try:
@@ -369,7 +370,7 @@ class UserRepositorty:
     ) -> list[User]:
         target_user = await session.get(User, target_id)
         if not target_user:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         query = (
             select(User)
             .join(user_subscriptions, user_subscriptions.c.following_id == User.id)
@@ -386,7 +387,7 @@ class UserRepositorty:
     ) -> list[User]:
         target_user = await session.get(User, target_id)
         if not target_user:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         query = (
             select(User)
             .join(user_subscriptions, user_subscriptions.c.follower_id == User.id)
@@ -401,11 +402,11 @@ class UserRepositorty:
     async def update_role(session: AsyncSession, target_id, new_role: Role) -> User:
         target_user: User | None = await session.get(User, target_id)
         if not target_user:
-            raise CouldNotFoundUserWithId(target_id)
+            raise CouldNotFoundUserWithIdError(target_id)
         if new_role == Role.owner:
             existing_owner = await UserRepositorty.get_owner(session)
             if existing_owner:
-                raise OwnerAlreadyRegistered()
+                raise OwnerAlreadyRegisteredError()
         target_user.role = new_role
         try:
             await session.flush()

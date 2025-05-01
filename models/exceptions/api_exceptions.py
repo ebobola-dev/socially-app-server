@@ -1,7 +1,8 @@
-from models.role import Role
-from config.server_config import SERVER_CONFIG
-from utils.sizes import SizeUtils
 from packaging.version import Version
+
+from config.server_config import ServerConfig
+from models.role import Role
+from utils.sizes import SizeUtils
 
 
 class ApiError(Exception):
@@ -45,7 +46,7 @@ class ForbiddenError(ApiError):
         super().__init__(403, server_message, global_errors)
 
 
-class ForbiddenForRole(ForbiddenError):
+class ForbiddenForRoleError(ForbiddenError):
     def __init__(
         self,
         input_role: Role,
@@ -57,7 +58,7 @@ class ForbiddenForRole(ForbiddenError):
         )
 
 
-class IncompleteRegistration(ForbiddenError):
+class IncompleteRegistrationError(ForbiddenError):
     def __init__(self, email):
         super().__init__(
             server_message=f"{email} has not completed registration yet",
@@ -78,7 +79,7 @@ class SpamError(ApiError):
         )
 
 
-class OtpSpam(SpamError):
+class OtpSpamError(SpamError):
     def __init__(self, email_address: str):
         super().__init__(
             server_message=f"Got otp spam from email: {email_address}",
@@ -86,7 +87,7 @@ class OtpSpam(SpamError):
         )
 
 
-class BadRequest(ApiError):
+class BadRequestError(ApiError):
     def __init__(
         self,
         server_message: str,
@@ -104,7 +105,7 @@ class BadRequest(ApiError):
         )
 
 
-class NotFound(ApiError):
+class NotFoundError(ApiError):
     def __init__(
         self,
         path: str,
@@ -116,7 +117,7 @@ class NotFound(ApiError):
         )
 
 
-class ValidationError(BadRequest):
+class ValidationError(BadRequestError):
     def __init__(
         self, field_specific_erros: dict[str, list], server_message: str | None = None
     ):
@@ -127,7 +128,7 @@ class ValidationError(BadRequest):
         )
 
 
-class BadDeviceID(ValidationError):
+class BadDeviceIDError(ValidationError):
     def __init__(self, input_device_id, valid_message: str | None = None):
         super().__init__(
             field_specific_erros={
@@ -137,7 +138,7 @@ class BadDeviceID(ValidationError):
         )
 
 
-class BadContentType(BadRequest):
+class BadContentTypeError(BadRequestError):
     def __init__(
         self,
         required_type: str,
@@ -149,7 +150,7 @@ class BadContentType(BadRequest):
         )
 
 
-class UnableToDecodeJsonBody(BadRequest):
+class UnableToDecodeJsonBodyError(BadRequestError):
     def __init__(self, error="?"):
         super().__init__(
             server_message=error,
@@ -157,7 +158,7 @@ class UnableToDecodeJsonBody(BadRequest):
         )
 
 
-class AlreadyFollowing(BadRequest):
+class AlreadyFollowingError(BadRequestError):
     def __init__(self, sub_username, target_username):
         super().__init__(
             server_message=f"@{sub_username} already following @{target_username}",
@@ -165,7 +166,7 @@ class AlreadyFollowing(BadRequest):
         )
 
 
-class NotFollowingAnyway(BadRequest):
+class NotFollowingAnywayError(BadRequestError):
     def __init__(self, sub_username, target_username):
         super().__init__(
             server_message=f"@{sub_username} not following @{target_username} anyway",
@@ -173,7 +174,7 @@ class NotFollowingAnyway(BadRequest):
         )
 
 
-class NothingToUpdate(BadRequest):
+class NothingToUpdateError(BadRequestError):
     def __init__(
         self,
         server_message: str = "Nothing to update",
@@ -182,31 +183,31 @@ class NothingToUpdate(BadRequest):
         super().__init__(server_message, global_errors)
 
 
-class UnableToValidate(ApiError):
+class UnableToValidateError(ApiError):
     def __init__(self, field_name: str, error):
         super().__init__(
             server_message=f"unable to validate field: {field_name}, {error}",
         )
 
 
-class OwnerAlreadyRegistered(BadRequest):
+class OwnerAlreadyRegisteredError(BadRequestError):
     def __init__(self):
         super().__init__("Owner already registered")
 
 
-class OwnerNotExist(ValidationError):
+class OwnerNotExistError(ValidationError):
     def __init__(self):
         super().__init__("Owner does not exist yet")
 
 
-class ImageIsTooLarge(BadRequest):
+class ImageIsTooLargeError(BadRequestError):
     def __init__(self, request_content_length: str):
         str_size = "?"
         if request_content_length.isdigit():
             str_size = SizeUtils.bytes_to_human_readable(int(request_content_length))
         super().__init__(
             f"Image is too large ({str_size})",
-            [f"Image is too large (max: {SERVER_CONFIG.MAX_IMAGE_SIZE}MB)"],
+            [f"Image is too large (max: {ServerConfig.MAX_IMAGE_SIZE}MB)"],
         )
 
 
@@ -218,7 +219,7 @@ class DatabaseError(ApiError):
         super().__init__(500, "Database error: " + server_message)
 
 
-class CouldNotSendOtpToEmail(BadRequest):
+class CouldNotSendOtpToEmailError(BadRequestError):
     def __init__(self, email_address, email_error="?"):
         super().__init__(
             server_message=f"Error on sending OTP code to email {email_address}: {email_error}",
@@ -228,7 +229,7 @@ class CouldNotSendOtpToEmail(BadRequest):
         )
 
 
-class UserWithEmailHasAlreadyCompletedRegistration(BadRequest):
+class UserWithEmailHasAlreadyCompletedRegistrationError(BadRequestError):
     def __init__(self, email_address):
         super().__init__(
             server_message=f"User with email ({email_address}) already exists and his registration is completed",
@@ -236,7 +237,7 @@ class UserWithEmailHasAlreadyCompletedRegistration(BadRequest):
         )
 
 
-class CouldNotFoundOtpWithEmail(BadRequest):
+class CouldNotFoundOtpWithEmailError(BadRequestError):
     def __init__(self, email_address):
         super().__init__(
             server_message=f"Could not found OTP with email: {email_address}",
@@ -244,7 +245,7 @@ class CouldNotFoundOtpWithEmail(BadRequest):
         )
 
 
-class IncorrectOtpCode(BadRequest):
+class IncorrectOtpCodeError(BadRequestError):
     def __init__(self):
         super().__init__(
             server_message="Incorrect OTP code",
@@ -252,7 +253,7 @@ class IncorrectOtpCode(BadRequest):
         )
 
 
-class CantFollowUnlollowYouself(BadRequest):
+class CantFollowUnlollowYouselfError(BadRequestError):
     def __init__(self):
         super().__init__(
             server_message="You can't follow(unfollow) to youself",
@@ -260,7 +261,7 @@ class CantFollowUnlollowYouself(BadRequest):
         )
 
 
-class OtpCodeIsOutdated(BadRequest):
+class OtpCodeIsOutdatedError(BadRequestError):
     def __init__(self):
         super().__init__(
             server_message="The OTP code is outdated",
@@ -268,7 +269,7 @@ class OtpCodeIsOutdated(BadRequest):
         )
 
 
-class CouldNotFoundUserWithId(BadRequest):
+class CouldNotFoundUserWithIdError(BadRequestError):
     def __init__(self, user_id: str):
         super().__init__(
             server_message=f"Could not found user with id ({user_id})",
@@ -276,7 +277,7 @@ class CouldNotFoundUserWithId(BadRequest):
         )
 
 
-class UsernameIsAlreadyTaken(BadRequest):
+class UsernameIsAlreadyTakenError(BadRequestError):
     def __init__(self, username: str):
         super().__init__(
             server_message=f"Username @{username} is already taken",
@@ -284,7 +285,7 @@ class UsernameIsAlreadyTaken(BadRequest):
         )
 
 
-class IncorrectLoginData(BadRequest):
+class IncorrectLoginDataError(BadRequestError):
     def __init__(self, server_message: str = "Incorrect login data"):
         super().__init__(
             server_message=server_message,
@@ -292,7 +293,7 @@ class IncorrectLoginData(BadRequest):
         )
 
 
-class CouldNotFoundUserWithSpecifiedData(BadRequest):
+class CouldNotFoundUserWithSpecifiedDataError(BadRequestError):
     def __init__(self, specified_data):
         super().__init__(
             server_message=f"Could not found user with specified data ({specified_data})",
@@ -302,7 +303,7 @@ class CouldNotFoundUserWithSpecifiedData(BadRequest):
         )
 
 
-class TryingToResetPasswordWithIncompletedRegistration(BadRequest):
+class TryingToResetPasswordWithIncompletedRegistrationError(BadRequestError):
     def __init__(self):
         super().__init__(
             server_message="Trying to reset password with incompleted registration",
@@ -310,7 +311,7 @@ class TryingToResetPasswordWithIncompletedRegistration(BadRequest):
         )
 
 
-class AvatarTypeIsNotExternal(BadRequest):
+class AvatarTypeIsNotExternalError(BadRequestError):
     def __init__(self):
         super().__init__(
             server_message="User avatar type is not external",
@@ -318,26 +319,26 @@ class AvatarTypeIsNotExternal(BadRequest):
         )
 
 
-class BadImageFileExt(BadRequest):
+class BadImageFileExtError(BadRequestError):
     def __init__(self, bad_ext):
         super().__init__(
             server_message=f"Got bad image file ext {bad_ext}",
             global_errors=[
-                f"Bad avatar image file ext, allowed: {SERVER_CONFIG.ALLOWED_IMAGE_EXTENSIONS}"
+                f"Bad avatar image file ext, allowed: {ServerConfig.ALLOWED_IMAGE_EXTENSIONS}"
             ],
         )
 
 
-class CouldNotFoundApkUpdateWithVersion(BadRequest):
+class CouldNotFoundApkUpdateWithVersionError(BadRequestError):
     def __init__(self, version: Version):
         super().__init__(f'Could not found apk update with version "{version}"')
 
 
-class ApkUpdateWithVersionAlreadyExists(BadRequest):
+class ApkUpdateWithVersionAlreadyExistsError(BadRequestError):
     def __init__(self, version: Version):
         super().__init__(f"Apk update with version ({version}) already exists")
 
 
-class UserDoesNotHaveExternalAvatarImage(BadRequest):
+class UserDoesNotHaveExternalAvatarImageError(BadRequestError):
     def __init__(self, username: str):
         super().__init__(f"Target user does not have an external avatar (@{username})")

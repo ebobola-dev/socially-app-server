@@ -1,7 +1,8 @@
 import asyncio
-import aiofiles
 from io import BytesIO
 from pathlib import Path
+
+import aiofiles
 from packaging.version import Version
 
 

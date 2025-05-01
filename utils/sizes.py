@@ -1,5 +1,6 @@
 class SizeUtils:
-    def bytes_to_human_readable(size_in_bytes):
+    @staticmethod
+    def bytes_to_human_readable(size_in_bytes: int):
         units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
 
         unit_index = 0

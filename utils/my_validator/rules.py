@@ -1,11 +1,11 @@
-from re import fullmatch, search
-from datetime import date, datetime
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar
+from datetime import date, datetime
 from enum import Enum
+from re import fullmatch, search
+from typing import Type, TypeVar
 
 from models.otp import Otp
-from utils.my_validator.exceptions import BadInitializeData
+from utils.my_validator.exceptions import BadInitializeDataError
 
 T = TypeVar("T")
 
@@ -30,9 +30,9 @@ class LengthRule(ValidateRule):
         max_length: int | None = None,
     ):
         if min_length < 0:
-            raise BadInitializeData(f"min_length must be >= 0 (input: {min_length})")
+            raise BadInitializeDataError(f"min_length must be >= 0 (input: {min_length})")
         if max_length is not None and min_length > max_length:
-            raise BadInitializeData(
+            raise BadInitializeDataError(
                 f"min_length must be <= max_length (input: {min_length} <-> {max_length})"
             )
         super().__init__()
@@ -114,10 +114,10 @@ class DateTimeIsoRule(ValidateRule):
 class EnumRule(ValidateRule):
     def __init__(self, enum: Type[T]) -> T:
         if not isinstance(enum, type) or not issubclass(enum, Enum):
-            raise BadInitializeData(f"EnumRule got wrong type (not Enum): {enum}")
+            raise BadInitializeDataError(f"EnumRule got wrong type (not Enum): {enum}")
         self.enum_values = tuple(e.value for e in enum)
         if any(map(lambda value: not isinstance(value, int), self.enum_values)):
-            raise BadInitializeData(
+            raise BadInitializeDataError(
                 "EnumRule can handle only those enums in which all values are [int]"
             )
         super().__init__()
@@ -151,7 +151,7 @@ class EnumRule(ValidateRule):
 class CanCreateInstanceRule(ValidateRule):
     def __init__(self, cls_type: Type[T]) -> T:
         if not isinstance(cls_type, type):
-            raise BadInitializeData("[cls_type] must be a type")
+            raise BadInitializeDataError("[cls_type] must be a type")
         super().__init__()
         self.cls_type = cls_type
 
@@ -166,9 +166,9 @@ class CanCreateInstanceRule(ValidateRule):
 class IsInstanceRule(ValidateRule):
     def __init__(self, *types: Type):
         if not types:
-            raise BadInitializeData("At least one type must be specified")
+            raise BadInitializeDataError("At least one type must be specified")
         if not all(isinstance(t, type) for t in types):
-            raise BadInitializeData("All arguments must be types")
+            raise BadInitializeDataError("All arguments must be types")
         self.types = types
         self.type_names = ", ".join(t.__name__ for t in types)
         super().__init__()

@@ -1,10 +1,21 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
-from sqlalchemy import text, select
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import (
+	AsyncEngine,
+	AsyncSession,
+	async_sessionmaker,
+	create_async_engine,
+)
 
-from config.database_config import DATABASE_CONFIG
+from config.database_config import DatabaseConfig
 from models.base import BaseModel
-from models.exceptions.initalize_exceptions import ConfigNotInitalizedButUsing, UnableToInitializeService, DatabaseNotInitialized
+from models.exceptions.initalize_exceptions import (
+	ConfigNotInitalizedButUsingError,
+	DatabaseNotInitializedError,
+	UnableToInitializeServiceError,
+)
 from repositories.user_repository import UserRepositorty
+
+
 class Database:
 	engine: AsyncEngine
 	session_maker: AsyncSession
@@ -13,8 +24,8 @@ class Database:
 	@staticmethod
 	async def initialize():
 		try:
-			if not DATABASE_CONFIG.INITALIZED:
-				raise ConfigNotInitalizedButUsing('DATABASE_CONFIG')
+			if not DatabaseConfig.INITALIZED:
+				raise ConfigNotInitalizedButUsingError('DATABASE_CONFIG')
 			Database.engine = await Database.check_database_exists()
 			if await Database.is_database_empty():
 				async with Database.engine.begin() as connection:
@@ -22,7 +33,7 @@ class Database:
 			Database.session_maker = async_sessionmaker(Database.engine, expire_on_commit=False)
 			Database.INITIALIZED = True
 		except Exception as error:
-			raise UnableToInitializeService('Database') from error
+			raise UnableToInitializeServiceError('Database') from error
 
 	@staticmethod
 	async def dispose():
@@ -31,14 +42,14 @@ class Database:
 	@staticmethod
 	async def check_database_exists():
 		engine_wo_db = create_async_engine(
-			f'mysql+asyncmy://{DATABASE_CONFIG.USER}:{DATABASE_CONFIG.PASSWORD}@{DATABASE_CONFIG.HOST}:{DATABASE_CONFIG.PORT}/'
+			f'mysql+asyncmy://{DatabaseConfig.USER}:{DatabaseConfig.PASSWORD}@{DatabaseConfig.HOST}:{DatabaseConfig.PORT}/'
 		)
 		async with engine_wo_db.begin() as connection:
-			await connection.execute(text(f'CREATE DATABASE IF NOT EXISTS {DATABASE_CONFIG.NAME}'))
+			await connection.execute(text(f'CREATE DATABASE IF NOT EXISTS {DatabaseConfig.NAME}'))
 			await connection.commit()
 		await engine_wo_db.dispose()
 		return create_async_engine(
-			f'mysql+asyncmy://{DATABASE_CONFIG.USER}:{DATABASE_CONFIG.PASSWORD}@{DATABASE_CONFIG.HOST}:{DATABASE_CONFIG.PORT}/{DATABASE_CONFIG.NAME}',
+			f'mysql+asyncmy://{DatabaseConfig.USER}:{DatabaseConfig.PASSWORD}@{DatabaseConfig.HOST}:{DatabaseConfig.PORT}/{DatabaseConfig.NAME}',
 			pool_pre_ping=True,
 		)
 
@@ -55,7 +66,7 @@ class Database:
 	@staticmethod
 	async def after_initialize():
 		if not Database.INITIALIZED:
-			raise DatabaseNotInitialized()
+			raise DatabaseNotInitializedError()
 		async with Database.session_maker() as session:
 			try:
 				await UserRepositorty.reset_sids(session)

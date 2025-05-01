@@ -1,13 +1,13 @@
 from os import getenv
 
-from config.server_config import SERVER_CONFIG
+from config.server_config import ServerConfig
 from models.exceptions.initalize_exceptions import (
-    UnableToInitializeService,
-    ServerConfigNotInitialized,
+    ServerConfigNotInitializedError,
+    UnableToInitializeServiceError,
 )
 
 
-class JWT_CONFIG:
+class JwtConfig:
     INITALIZED: bool = False
     ACCESS_SERCER_KEY: str
     REFRESH_SERCER_KEY: str
@@ -18,15 +18,15 @@ class JWT_CONFIG:
     @staticmethod
     def initialize():
         try:
-            if not SERVER_CONFIG.INITIALIZED:
-                raise ServerConfigNotInitialized()
-            JWT_CONFIG.ACCESS_SERCER_KEY = getenv("JWT_ACCESS_SERCER_KEY")
-            JWT_CONFIG.REFRESH_SERCER_KEY = getenv("JWT_REFRESH_SERCER_KEY")
-            JWT_CONFIG.ENCODE_ALGORITNM = getenv("JWT_ENCODE_ALGORITNM")
-            JWT_CONFIG.ACCESS_DURABILITY_MIN = int(getenv("JWT_ACCESS_DURABILITY_MIN"))
-            JWT_CONFIG.REFRESH_DURABILITY_DAYS = int(
+            if not ServerConfig.INITIALIZED:
+                raise ServerConfigNotInitializedError()
+            JwtConfig.ACCESS_SERCER_KEY = getenv("JWT_ACCESS_SERCER_KEY")
+            JwtConfig.REFRESH_SERCER_KEY = getenv("JWT_REFRESH_SERCER_KEY")
+            JwtConfig.ENCODE_ALGORITNM = getenv("JWT_ENCODE_ALGORITNM")
+            JwtConfig.ACCESS_DURABILITY_MIN = int(getenv("JWT_ACCESS_DURABILITY_MIN"))
+            JwtConfig.REFRESH_DURABILITY_DAYS = int(
                 getenv("JWT_REFRESH_DURABILITY_DAYS")
             )
-            JWT_CONFIG.INITALIZED = True
+            JwtConfig.INITALIZED = True
         except Exception as error:
-            raise UnableToInitializeService("JWT_CONFIG") from error
+            raise UnableToInitializeServiceError("JWT_CONFIG") from error

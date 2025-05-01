@@ -1,13 +1,13 @@
 from os import getenv
 
-from config.server_config import SERVER_CONFIG
+from config.server_config import ServerConfig
 from models.exceptions.initalize_exceptions import (
-    UnableToInitializeService,
-    ServerConfigNotInitialized,
+    ServerConfigNotInitializedError,
+    UnableToInitializeServiceError,
 )
 
 
-class EMAIL_CONFIG:
+class EmailConfig:
     INITALIZED: bool = False
     ADDRESS: str
     PASSWORD: str
@@ -15,10 +15,10 @@ class EMAIL_CONFIG:
     @staticmethod
     def initialize():
         try:
-            if not SERVER_CONFIG.INITIALIZED:
-                raise ServerConfigNotInitialized()
-            EMAIL_CONFIG.ADDRESS = getenv("APP_EMAIL_ADDRESS")
-            EMAIL_CONFIG.PASSWORD = getenv("APP_EMAIL_PASSWORD")
-            EMAIL_CONFIG.INITALIZED = True
+            if not ServerConfig.INITIALIZED:
+                raise ServerConfigNotInitializedError()
+            EmailConfig.ADDRESS = getenv("APP_EMAIL_ADDRESS")
+            EmailConfig.PASSWORD = getenv("APP_EMAIL_PASSWORD")
+            EmailConfig.INITALIZED = True
         except Exception as error:
-            raise UnableToInitializeService("EMAIL_CONFIG") from error
+            raise UnableToInitializeServiceError("EMAIL_CONFIG") from error

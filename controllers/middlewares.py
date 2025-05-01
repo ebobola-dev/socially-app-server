@@ -8,11 +8,11 @@ from aiohttp.web_exceptions import HTTPError
 from database.database import Database
 from models.exceptions.api_exceptions import (
     ApiError,
-    BadContentType,
-    BadDeviceID,
-    ForbiddenForRole,
-    IncompleteRegistration,
-    UnableToDecodeJsonBody,
+    BadContentTypeError,
+    BadDeviceIDError,
+    ForbiddenForRoleError,
+    IncompleteRegistrationError,
+    UnableToDecodeJsonBodyError,
     UnauthorizedError,
     ValidationError,
 )
@@ -69,7 +69,7 @@ def device_id_specified():
         async def wrapper(self, request: Request):
             device_id = request.headers.get("device_id")
             if not isinstance(device_id, str) or not device_id:
-                raise BadDeviceID(device_id)
+                raise BadDeviceIDError(device_id)
             request.device_id = device_id
             return await handler(self, request)
 
@@ -84,14 +84,14 @@ def content_type_is_json():
         async def wrapper(self, request: Request):
             content_type = request.headers.get("Content-Type")
             if not content_type or content_type != "application/json":
-                raise BadContentType(
+                raise BadContentTypeError(
                     required_type="application/json",
                     input_type=content_type,
                 )
             try:
                 await request.json()
             except Exception as error:
-                raise UnableToDecodeJsonBody(error)
+                raise UnableToDecodeJsonBodyError(error)
             return await handler(self, request)
 
         return wrapper
@@ -105,7 +105,7 @@ def content_type_is_multipart():
         async def wrapper(self, request: Request):
             content_type = request.headers.get("Content-Type")
             if not content_type or not content_type.startswith("multipart/form-data"):
-                raise BadContentType(
+                raise BadContentTypeError(
                     required_type="multipart/form-data",
                     input_type=content_type,
                 )
@@ -124,7 +124,7 @@ def registration_completed():
             if not user:
                 raise UnauthorizedError()
             if not user.is_registration_completed:
-                raise IncompleteRegistration(email=user.email_address)
+                raise IncompleteRegistrationError(email=user.email_address)
             return await handler(self, request)
 
         return wrapper
@@ -137,7 +137,7 @@ def owner_role():
         @wraps(handler)
         async def wrapper(self, request: Request):
             if not request.user_role.is_owner:
-                raise ForbiddenForRole(
+                raise ForbiddenForRoleError(
                     required_role=Role.owner,
                     input_role=request.user_role,
                 )
@@ -145,13 +145,13 @@ def owner_role():
             existing_owner = await UserRepositorty.get_owner(request.db_session)
             if not existing_owner:
                 # self._logger.warning(f'Owner does not exists yet, but user role in token is OWNER')
-                raise ForbiddenForRole(
+                raise ForbiddenForRoleError(
                     required_role=Role.owner,
                     input_role=request.user_role,
                 )
             if request.user_id != existing_owner.id:
                 # self._logger.warning(f'Real owner id != user id in token, but user role in token is OWNER')
-                raise ForbiddenForRole(
+                raise ForbiddenForRoleError(
                     required_role=Role.owner,
                     input_role=request.user_role,
                 )
@@ -167,7 +167,7 @@ def admin_role():
         @wraps(handler)
         async def wrapper(self, request: Request):
             if not request.user_role.is_admin:
-                raise ForbiddenForRole(
+                raise ForbiddenForRoleError(
                     required_role=Role.admin,
                     input_role=request.user_role,
                 )

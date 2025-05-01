@@ -2,17 +2,18 @@
 from email.message import EmailMessage
 from email.utils import make_msgid
 
-from config.email_config import EMAIL_CONFIG
-from models.otp import OtpDestiny
-
 from aiosmtplib import SMTP
+
+from config.email_config import EmailConfig
+from models.otp import OtpDestiny
 
 
 class EmailService:
+    @staticmethod
     async def send_otp(email, otp_value: str, destiny: OtpDestiny):
         message = EmailMessage()
         message["Subject"] = f"Your OTP code for {destiny.value} on Socially App"
-        message["From"] = EMAIL_CONFIG.ADDRESS
+        message["From"] = EmailConfig.ADDRESS
         message["To"] = email
         message["Message-ID"] = make_msgid()
         message.set_content(
@@ -25,6 +26,6 @@ class EmailService:
             use_tls=True,
         )
         await smtp.connect()
-        await smtp.login(EMAIL_CONFIG.ADDRESS, EMAIL_CONFIG.PASSWORD)
+        await smtp.login(EmailConfig.ADDRESS, EmailConfig.PASSWORD)
         await smtp.send_message(message)
         await smtp.quit()

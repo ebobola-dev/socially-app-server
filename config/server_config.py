@@ -1,9 +1,9 @@
 from os import getenv
 
-from models.exceptions.initalize_exceptions import UnableToInitializeService
+from models.exceptions.initalize_exceptions import UnableToInitializeServiceError
 
 
-class SERVER_CONFIG:
+class ServerConfig:
     INITIALIZED: bool = False
     HOST: str
     PORT: int
@@ -22,14 +22,14 @@ class SERVER_CONFIG:
     @staticmethod
     def initialize():
         try:
-            SERVER_CONFIG.RUN_IN_DOCKER = bool(getenv("RUN_IN_DOCKER"))
-            if not SERVER_CONFIG.RUN_IN_DOCKER:
+            ServerConfig.RUN_IN_DOCKER = bool(getenv("RUN_IN_DOCKER"))
+            if not ServerConfig.RUN_IN_DOCKER:
                 from dotenv import load_dotenv
 
                 load_dotenv(override=True)
-            SERVER_CONFIG.HOST = getenv("SERVER_HOST")
-            SERVER_CONFIG.PORT = int(getenv("SERVER_PORT"))
-            SERVER_CONFIG.OWNER_KEY = getenv("OWNER_KEY")
-            SERVER_CONFIG.INITIALIZED = True
+            ServerConfig.HOST = getenv("SERVER_HOST")
+            ServerConfig.PORT = int(getenv("SERVER_PORT"))
+            ServerConfig.OWNER_KEY = getenv("OWNER_KEY")
+            ServerConfig.INITIALIZED = True
         except Exception as error:
-            raise UnableToInitializeService("SERVER_CONFIG") from error
+            raise UnableToInitializeServiceError("SERVER_CONFIG") from error

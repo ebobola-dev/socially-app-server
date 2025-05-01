@@ -1,7 +1,8 @@
+from enum import Enum
+from io import BytesIO
+
 from filetype import guess
 from PIL import Image, UnidentifiedImageError
-from io import BytesIO
-from enum import Enum
 
 
 class PillowValidatationResult(Enum):

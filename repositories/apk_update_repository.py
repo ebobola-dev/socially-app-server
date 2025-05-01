@@ -1,9 +1,10 @@
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.apk_update import ApkUpdate
-from models.version_type import VersionType
 from models.exceptions.api_exceptions import DatabaseError
+from models.version_type import VersionType
+
 
 class ApkUpdateRepository:
 	@staticmethod

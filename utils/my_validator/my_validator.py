@@ -1,13 +1,15 @@
 from functools import wraps
+
 from aiohttp.web import Request
 from packaging.version import Version
 
-from config.length_requirements import LENGTH_REQIREMENTS
-from config.re_patterns import RE_PATTERNS
+from config.length_requirements import LengthRequirements
+from config.re_patterns import RePatterns
 from models.avatar_type import AvatarType
-from models.exceptions.api_exceptions import UnableToValidate, ValidationError
+from models.exceptions.api_exceptions import UnableToValidateError, ValidationError
 from models.gender import Gender
 from models.role import Role
+from utils.my_validator.exceptions import MyValidatorError
 from utils.my_validator.rules import (
     CanCreateInstanceRule,
     DateIsoRule,
@@ -20,7 +22,6 @@ from utils.my_validator.rules import (
     RuleError,
     ValidateRule,
 )
-from utils.my_validator.exceptions import MyValidatorError
 
 
 class ValidateField:
@@ -54,7 +55,7 @@ class ValidateField:
             nullable=nullable,
             rules=[
                 ReFullmatchPatternRule(
-                    re_pattern=RE_PATTERNS.EMAIL, error_description="Invalid Email"
+                    re_pattern=RePatterns.EMAIL, error_description="Invalid Email"
                 )
             ],
         )
@@ -76,7 +77,7 @@ class ValidateField:
             nullable=nullable,
             rules=[
                 IsInstanceRule(str),
-                LengthRule(max_length=LENGTH_REQIREMENTS.FULLNAME.MAX),
+                LengthRule(max_length=LengthRequirements.Fullname.MAX),
             ],
         )
 
@@ -137,7 +138,7 @@ class ValidateField:
             nullable=nullable,
             rules=[
                 IsInstanceRule(str),
-                LengthRule(max_length=LENGTH_REQIREMENTS.ABOUT_ME.MAX),
+                LengthRule(max_length=LengthRequirements.AboutMe.MAX),
             ],
         )
 
@@ -172,8 +173,8 @@ class ValidateField:
             rules=[
                 IsInstanceRule(str),
                 ReFullmatchPatternRule(
-                    RE_PATTERNS.PASSWORD,
-                    error_description=LENGTH_REQIREMENTS.PASSWORD.TEXT,
+                    RePatterns.PASSWORD,
+                    error_description=LengthRequirements.Password.TEXT,
                 ),
             ],
         )
@@ -206,7 +207,7 @@ def validate(
             except RuleError as rule_error:
                 errors.append(rule_error.error_message)
             except Exception as unexcepted_error:
-                raise UnableToValidate(
+                raise UnableToValidateError(
                     field_name=field_name, error=unexcepted_error
                 ) from unexcepted_error
     if errors:

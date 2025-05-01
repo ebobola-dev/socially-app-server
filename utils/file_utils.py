@@ -3,6 +3,7 @@ from io import BytesIO
 
 
 class FileUtils:
+    @staticmethod
     def calculate_sha256_from_bytesio(data: BytesIO) -> str:
         sha256_hash = hashlib.sha256()
         data.seek(0)

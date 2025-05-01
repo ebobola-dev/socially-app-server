@@ -1,24 +1,25 @@
-import colorlog
-from os import getenv
-from zoneinfo import ZoneInfo
 from datetime import datetime
+from os import getenv
 
-from config.server_config import SERVER_CONFIG
+import colorlog
+from zoneinfo import ZoneInfo
+
+from config.server_config import ServerConfig
 from models.exceptions.initalize_exceptions import (
-    UnableToInitializeService,
-    ServerConfigNotInitialized,
+    ServerConfigNotInitializedError,
+    UnableToInitializeServiceError,
 )
 
 _MOSCOW_ZONE = ZoneInfo("Europe/Moscow")
 
 
 class _MYFormatter(colorlog.ColoredFormatter):
-    def formatTime(self, record, datefmt=None):
+    def formatTime(self, record, datefmt=None):  # noqa: N802
         dt = datetime.fromtimestamp(record.created, tz=_MOSCOW_ZONE)
         return dt.strftime(datefmt or "%Y-%m-%d %H:%M:%S %Z")
 
 
-class MY_LOGGER_CONFIG:
+class MyLoggerConfig:
     INITALIZED: bool = False
     LEVEL: str
     COLOR_HANDLER: colorlog.StreamHandler
@@ -26,12 +27,12 @@ class MY_LOGGER_CONFIG:
     @staticmethod
     def initialize():
         try:
-            if not SERVER_CONFIG.INITIALIZED:
-                raise ServerConfigNotInitialized()
-            MY_LOGGER_CONFIG.LEVEL = getenv("LOGGING_LEVEL")
+            if not ServerConfig.INITIALIZED:
+                raise ServerConfigNotInitializedError()
+            MyLoggerConfig.LEVEL = getenv("LOGGING_LEVEL")
 
-            MY_LOGGER_CONFIG.COLOR_HANDLER = colorlog.StreamHandler()
-            MY_LOGGER_CONFIG.COLOR_HANDLER.setFormatter(
+            MyLoggerConfig.COLOR_HANDLER = colorlog.StreamHandler()
+            MyLoggerConfig.COLOR_HANDLER.setFormatter(
                 _MYFormatter(
                     "%(log_color)s%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
                     datefmt="%m.%d %H:%M:%S",
@@ -44,8 +45,8 @@ class MY_LOGGER_CONFIG:
                     },
                 )
             )
-            MY_LOGGER_CONFIG.COLOR_HANDLER.setLevel(MY_LOGGER_CONFIG.LEVEL)
+            MyLoggerConfig.COLOR_HANDLER.setLevel(MyLoggerConfig.LEVEL)
 
-            MY_LOGGER_CONFIG.INITALIZED = True
+            MyLoggerConfig.INITALIZED = True
         except Exception as error:
-            raise UnableToInitializeService("MY_LOGGER_CONFIG") from error
+            raise UnableToInitializeServiceError("MY_LOGGER_CONFIG") from error

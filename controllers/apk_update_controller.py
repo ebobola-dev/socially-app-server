@@ -6,7 +6,7 @@ from re import fullmatch
 from aiohttp.web import FileResponse, Request, Response, json_response
 from packaging.version import Version
 
-from config.re_patterns import RE_PATTERNS
+from config.re_patterns import RePatterns
 from controllers.middlewares import (
     authenticate,
     content_type_is_multipart,
@@ -15,8 +15,8 @@ from controllers.middlewares import (
 from controllers.sio_controller import SioController
 from models.apk_update import ApkUpdate
 from models.exceptions.api_exceptions import (
-    ApkUpdateWithVersionAlreadyExists,
-    CouldNotFoundApkUpdateWithVersion,
+    ApkUpdateWithVersionAlreadyExistsError,
+    CouldNotFoundApkUpdateWithVersionError,
     ValidationError,
 )
 from repositories.apk_update_repository import ApkUpdateRepository
@@ -41,7 +41,7 @@ class ApkUpdatesController:
             version=version,
         )
         if not saved_apk_update:
-            raise CouldNotFoundApkUpdateWithVersion(version)
+            raise CouldNotFoundApkUpdateWithVersionError(version)
         latest_apk_updates = await ApkUpdateRepository.get(
             session=request.db_session,
             min_version=version,
@@ -97,7 +97,7 @@ class ApkUpdatesController:
                         raise ValidationError(
                             {"apk": "must be specified, must be a file"}
                         )
-                    match = fullmatch(RE_PATTERNS.APK_UPDATE_FILE, apk_filename)
+                    match = fullmatch(RePatterns.APK_UPDATE_FILE, apk_filename)
                     if not match:
                         raise ValidationError(
                             {
@@ -144,7 +144,7 @@ class ApkUpdatesController:
             version=version,
         )
         if saved_apk_update:
-            raise ApkUpdateWithVersionAlreadyExists(version)
+            raise ApkUpdateWithVersionAlreadyExistsError(version)
         sha256_hash = await asyncio.to_thread(
             lambda: FileUtils.calculate_sha256_from_bytesio(apk_file_buffer)
         )
@@ -191,6 +191,6 @@ class ApkUpdatesController:
                 version=version,
             )
         ):
-            raise CouldNotFoundApkUpdateWithVersion(version)
+            raise CouldNotFoundApkUpdateWithVersionError(version)
         apk_filepath = await FileService.get_apk_filepath(version)
         return FileResponse(apk_filepath)

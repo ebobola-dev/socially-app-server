@@ -1,16 +1,17 @@
-from random import randint
 from datetime import datetime
-from sqlalchemy import select, delete
+from random import randint
+
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.server_config import SERVER_CONFIG
-from models.otp import Otp
+from config.server_config import ServerConfig
 from models.exceptions.api_exceptions import (
+    CouldNotFoundOtpWithEmailError,
     DatabaseError,
-    CouldNotFoundOtpWithEmail,
-    OtpCodeIsOutdated,
-    IncorrectOtpCode,
+    IncorrectOtpCodeError,
+    OtpCodeIsOutdatedError,
 )
+from models.otp import Otp
 
 
 class OtpRepository:
@@ -57,10 +58,10 @@ class OtpRepository:
     async def verify(session: AsyncSession, email: str, otp_code: list[int]) -> None:
         saved_otp = await OtpRepository.get_by_email(session, email)
         if saved_otp is None:
-            raise CouldNotFoundOtpWithEmail(email)
+            raise CouldNotFoundOtpWithEmailError(email)
         timedelta = datetime.now() - saved_otp.updated_at
         difference_in_minutes = (timedelta.seconds // 60) % 60
-        if difference_in_minutes > SERVER_CONFIG.OTP_CODE_DURABILITY_MIN:
-            raise OtpCodeIsOutdated()
+        if difference_in_minutes > ServerConfig.OTP_CODE_DURABILITY_MIN:
+            raise OtpCodeIsOutdatedError()
         if saved_otp.value != otp_code:
-            raise IncorrectOtpCode()
+            raise IncorrectOtpCodeError()

@@ -1,5 +1,6 @@
-from enum import Enum
 from datetime import date, datetime, timezone
+from enum import Enum
+
 from packaging.version import Version
 
 
