@@ -26,6 +26,9 @@ class Pagination:
             per_page=10,
         )
 
+    def __str__(self):
+        return f"<Pagination>(page: {self.page}, limit: {self.per_page})"
+
     @property
     def offset(self):
         return (self.page - 1) * self.per_page

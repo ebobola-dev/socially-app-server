@@ -13,6 +13,8 @@ services:
     volumes:
       - /home/ebobola/data/socially_app/external_avatars:/files/external_avatars
       - /home/ebobola/data/socially_app/apks:/files/apks
+      - /home/ebobola/data/socially_app/posts:/files/posts
+      - /home/ebobola/data/socially_app/messages:/files/messages
     expose:
       - "${SERVER_PORT}"
     depends_on:

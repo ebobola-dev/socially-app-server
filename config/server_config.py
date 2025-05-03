@@ -5,6 +5,7 @@ from models.exceptions.initalize_exceptions import UnableToInitializeServiceErro
 
 class ServerConfig:
     INITIALIZED: bool = False
+    RUN_IN_DOCKER = False
     HOST: str
     PORT: int
     OWNER_KEY: str
@@ -17,7 +18,8 @@ class ServerConfig:
     )
     MAX_IMAGE_SIZE = 7  # ? in MB
     OTP_CODE_DURABILITY_MIN = 15
-    RUN_IN_DOCKER = False
+    MAX_IMAGES_IN_POST = 10
+    MAX_IMAGES_IN_MESSAGE = 10
 
     @staticmethod
     def initialize():

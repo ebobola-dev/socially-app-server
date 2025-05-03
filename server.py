@@ -13,6 +13,7 @@ from config.server_config import ServerConfig
 from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
 from controllers.middlewares import Middlewares
+from controllers.posts_controller import PostsController
 from controllers.registration_controller import RegistrationController
 from controllers.sio_controller import SioController
 from controllers.test_users_controller import TestUsersController
@@ -93,6 +94,10 @@ async def main():
         logger=MyLogger.get_logger("Apk Updates"),
         main_sio_namespace=main_sio_namespace,
     )
+    posts_controller = PostsController(
+        logger=MyLogger.get_logger("Posts"),
+        main_sio_namespace=main_sio_namespace,
+    )
 
     app.add_routes(
         [
@@ -140,6 +145,12 @@ async def main():
             web.get(Paths.ApkUpdates.GET_MANY, apk_updates_controller.get_many),
             web.get(Paths.ApkUpdates.DOWNLOAD, apk_updates_controller.download),
             web.delete(Paths.ApkUpdates.DELETE, apk_updates_controller.delete),
+
+            web.get(Paths.Posts.GET_ALL, posts_controller.get_all),
+            web.get(Paths.Posts.GET_ONE, posts_controller.get_one),
+            web.delete(Paths.Posts.DELETE, posts_controller.delete),
+            web.post(Paths.Posts.CREATE, posts_controller.create),
+            web.get(Paths.Posts.GET_IMAGE, posts_controller.get_post_image),
         ]
     )
 

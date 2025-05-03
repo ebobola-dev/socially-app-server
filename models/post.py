@@ -4,9 +4,9 @@ from uuid import uuid4
 
 from sqlalchemy import (
     CHAR,
+    JSON,
     DateTime,
     ForeignKey,
-    Integer,
     String,
 )
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
@@ -32,7 +32,7 @@ class Post(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     text_content: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
-    images_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    image_exts: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -67,15 +67,17 @@ class Post(BaseModel):
     @staticmethod
     def new(
         author_id: str,
-        text_content: str = "",
+        text_content: str,
+        image_exts: list[str],
     ):
         return Post(
             author_id=author_id,
             text_content=text_content,
+            image_exts=image_exts,
         )
 
     def __repr__(self):
-        return f"<Post>({self.id}, {self.created_at})"
+        return f"<Post>({self.id}, {self.created_at}, {self.image_exts})"
 
     @property
     def is_deleted(self) -> bool:

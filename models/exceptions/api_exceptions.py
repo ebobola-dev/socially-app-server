@@ -201,7 +201,7 @@ class OwnerNotExistError(ValidationError):
 
 
 class ImageIsTooLargeError(BadRequestError):
-    def __init__(self, request_content_length: str):
+    def __init__(self, request_content_length: str = '?'):
         str_size = "?"
         if request_content_length.isdigit():
             str_size = SizeUtils.bytes_to_human_readable(int(request_content_length))
@@ -332,7 +332,7 @@ class BadImageFileExtError(BadRequestError):
         super().__init__(
             server_message=f"Got bad image file ext {bad_ext}",
             global_errors=[
-                f"Bad avatar image file ext, allowed: {ServerConfig.ALLOWED_IMAGE_EXTENSIONS}"
+                f"Bad avatar image file ext({bad_ext}), allowed: {ServerConfig.ALLOWED_IMAGE_EXTENSIONS}"
             ],
         )
 
@@ -350,3 +350,21 @@ class ApkUpdateWithVersionAlreadyExistsError(BadRequestError):
 class UserDoesNotHaveExternalAvatarImageError(BadRequestError):
     def __init__(self, username: str):
         super().__init__(f"Target user does not have an external avatar (@{username})")
+
+class PostNoImagesError(BadRequestError):
+    def __init__(self):
+        super().__init__("The post must contain at least one image")
+
+class ToManyImagesInPostError(BadRequestError):
+    def __init__(self):
+        super().__init__(f"Post can contain no more that {ServerConfig.MAX_IMAGES_IN_POST} images")
+class ToManyImagesInMessageError(BadRequestError):
+    def __init__(self):
+        super().__init__(f"Message can contain no more that {ServerConfig.MAX_IMAGES_IN_MESSAGE} images")
+
+class PostNotFoundError(BadRequestError):
+    def __init__(self, post_id: str):
+        super().__init__(
+            server_message=f"Could not found post with id ({post_id})",
+            global_errors=["Post not found"],
+        )

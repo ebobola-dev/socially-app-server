@@ -48,3 +48,11 @@ class Paths:
         GET_ONE = f"{_base_path}/{{update_id}}"
         DELETE = f"{_base_path}/delete"
         DOWNLOAD = f"{_base_path}/download"
+
+    class Posts:
+        _base_path = f"{_base_api_path}/posts"
+        GET_ALL = _base_path
+        CREATE = _base_path
+        DELETE = _base_path
+        GET_ONE = f"{_base_path}/{{post_id}}"
+        GET_IMAGE = f"{_base_path}/{{post_id}}/images"
