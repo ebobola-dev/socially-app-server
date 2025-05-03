@@ -33,6 +33,7 @@ config.set_main_option("sqlalchemy.url", database_url)
 from models.otp import Otp
 from models.user import User
 from models.user_subscriptions import user_subscriptions
+from models.post_likes import post_likes
 from models.refresh_token import RefreshToken
 from models.apk_update import ApkUpdate
 from models.post import Post

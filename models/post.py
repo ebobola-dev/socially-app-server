@@ -9,7 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from models.base import BaseModel
 
@@ -52,6 +52,15 @@ class Post(BaseModel):
         "Comment",
         back_populates="post",
         cascade="save-update, merge",
+        passive_deletes=True,
+    )
+
+    liked_by = relationship(
+        "User",
+        secondary="post_likes",
+        backref=backref("liked_posts", lazy="selectin"),
+        lazy="selectin",
+        cascade="all, delete",
         passive_deletes=True,
     )
 

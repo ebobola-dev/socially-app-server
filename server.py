@@ -20,6 +20,7 @@ from controllers.users_controller import UsersController
 from database.database import Database
 from models.comment import Comment  # noqa: F401
 from models.post import Post  # noqa: F401
+from models.post_likes import post_likes  # noqa: F401
 from models.user import User  # noqa: F401
 from services.test_users import TestUsers
 

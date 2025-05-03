@@ -64,16 +64,12 @@ class User(BaseModel):
         unique=True,
         nullable=False,
     )
-    email_address: Mapped[str] = mapped_column(
-        String(320), unique=True, nullable=False
-    )
+    email_address: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(16), unique=True, nullable=True)
     hashed_password: Mapped[bytes] = mapped_column(BINARY(60), nullable=True)
     fullname: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     date_of_birth: Mapped[date] = mapped_column(DATE(), nullable=True)
-    gender: Mapped[Gender | None] = mapped_column(
-        SqlAlchemyEnum(Gender), nullable=True
-    )
+    gender: Mapped[Gender | None] = mapped_column(SqlAlchemyEnum(Gender), nullable=True)
     about_me: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     role: Mapped[Role] = mapped_column(
         SqlAlchemyEnum(Role), nullable=False, default=Role.user
