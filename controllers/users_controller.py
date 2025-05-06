@@ -20,6 +20,7 @@ from models.exceptions.api_exceptions import (
     BadImageFileExtError,
     BadRequestError,
     ImageIsTooLargeError,
+    InvalidImageError,
     NothingToUpdateError,
     UnauthorizedError,
     UserDoesNotHaveExternalAvatarImageError,
@@ -30,7 +31,7 @@ from models.exceptions.api_exceptions import (
 from models.gender import Gender
 from models.pagination import Pagination
 from models.role import Role
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from services.file_service import FileService
 from services.tokens_service import TokensService
 from utils.image_utils import ImageUtils, PillowValidatationResult
@@ -48,7 +49,7 @@ class UsersController:
         username = request.query.get("username")
         ValidateField.username()(username)
 
-        user = await UserRepositorty.get_by_username(request.db_session, username)
+        user = await UserRepository.get_by_username(request.db_session, username)
         self._logger.debug(
             f"@{username} is {'not exists' if user is None else 'exists'}\n"
         )
@@ -57,7 +58,7 @@ class UsersController:
     @authenticate()
     async def get_by_id(self, request: Request):
         user_id = request.match_info["user_id"]
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id, include_deleted=True)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, user_id, include_deleted=True)
         if user is None:
             raise UserNotFoundError(user_id)
         return json_response(data=user.to_json(safe=user_id == request.user_id))
@@ -73,7 +74,7 @@ class UsersController:
         )(search_data)
         search_data = search_data.strip()
 
-        result = await UserRepositorty.find_by_pattern(
+        result = await UserRepository.find_by_pattern(
             session=request.db_session,
             pattern=search_data,
             pagination=pagination,
@@ -103,7 +104,7 @@ class UsersController:
         ValidateField.about_me(required=False),
     )
     async def update_profile(self, request: Request):
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
         body: dict = request["validated_body"]
         fullname = body.get("fullname")
         username = body.get("username")
@@ -114,11 +115,11 @@ class UsersController:
 
         new_data = dict()
 
-        if fullname and user.fullname != fullname:
+        if fullname is not None and user.fullname != fullname:
             new_data["fullname"] = fullname
 
         if username and username != user.username:
-            user_with_username = await UserRepositorty.get_by_username(
+            user_with_username = await UserRepository.get_by_username(
                 request.db_session, username
             )
             if user_with_username:
@@ -139,7 +140,7 @@ class UsersController:
                 raise ValidationError({"date_of_birth": "must be day before today"})
             new_data["date_of_birth"] = date_of_birth
 
-        if about_me and user.about_me != about_me:
+        if about_me is not None and user.about_me != about_me:
             new_data["about_me"] = about_me
 
         if not new_data:
@@ -149,7 +150,7 @@ class UsersController:
 
         self._logger.debug(f"{user.email_address} will changed: {new_data}")
 
-        updated_user = await UserRepositorty.update_(
+        updated_user = await UserRepository.update_(
             request.db_session, user.id, new_data
         )
 
@@ -159,17 +160,17 @@ class UsersController:
     @content_type_is_json()
     @validate_request_body(ValidateField.password(field_name="new_password"))
     async def update_password(self, request: Request):
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
         body: dict = request["validated_body"]
         new_password = body.get("new_password")
-        await UserRepositorty.update_password(request.db_session, user.id, new_password)
+        await UserRepository.update_password(request.db_session, user.id, new_password)
         self._logger.debug(f"Password updated [{user.email_address}]")
         return json_response()
 
     @authenticate()
     @content_type_is_multipart()
     async def update_avatar(self, request: Request):
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
         content_length = request.headers.get("Content-Length")
         try:
             int_length = int(content_length)
@@ -185,19 +186,20 @@ class UsersController:
 
         avatar_file_buffer = None
         file_ext = None
+        filename = None
         avatar_type = None
 
         async for part in reader:
             match part.name:
                 case "avatar":
-                    avatar_filename = part.filename
-                    if avatar_filename is None or avatar_filename == "":
+                    filename = part.filename
+                    if filename is None or filename == "":
                         raise ValidationError(
                             {
                                 "avatar": "must be a file",
                             }
                         )
-                    file_ext = avatar_filename[avatar_filename.rfind(".") :]
+                    file_ext = filename[filename.rfind(".") :]
                     if (
                         not file_ext
                         or file_ext == "."
@@ -245,7 +247,7 @@ class UsersController:
                 pillow_validation_result != PillowValidatationResult.invalid
                 and is_valid_by_filetype
             ):
-                raise ValidationError({"avatar": "invalid image file"})
+                raise InvalidImageError(field_name='avatar', filename=filename)
             avatar_id = uuid4()
             if user.avatar_id is not None:
                 await FileService.delete_avatar(user.id)
@@ -254,7 +256,7 @@ class UsersController:
                 avatar_bytes=avatar_file_buffer,
                 avatar_filename_ext=file_ext[1:],
             )
-            updated_user = await UserRepositorty.update_avatar(
+            updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
                 user_id=user.id,
                 new_avatar_type=avatar_type,
@@ -265,7 +267,7 @@ class UsersController:
         else:
             if user.avatar_type is AvatarType.external:
                 await FileService.delete_avatar(user.id)
-            updated_user = await UserRepositorty.update_avatar(
+            updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
                 user_id=user.id,
                 new_avatar_type=avatar_type,
@@ -276,17 +278,17 @@ class UsersController:
     @authenticate()
     async def delete_avatar(self, request: Request):
         user_id = request.user_id
-        saved_user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+        saved_user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
         if not saved_user:
             raise UserNotFoundError(user_id)
-        updated_user = await UserRepositorty.delete_avatar(request.db_session, user_id)
+        updated_user = await UserRepository.delete_avatar(request.db_session, user_id)
         await FileService.delete_avatar(user_id)
         self._logger.debug(f"@{saved_user.username} deleted avatar")
         return json_response(data={"updated_user": updated_user.to_json(safe=True)})
 
     async def get_avatar_image(self, request: Request):
         user_id = request.match_info.get("user_id")
-        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+        target_user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
         if not target_user:
             raise UserNotFoundError(user_id)
         if not target_user.avatar_id or target_user.avatar_type != AvatarType.external:
@@ -309,11 +311,11 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        updated_user = await UserRepositorty.follow(
+        updated_user = await UserRepository.follow(
             request.db_session, user_id, target_id
         )
 
-        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, target_id)
+        target_user = await UserRepository.get_by_id_with_relations(request.db_session, target_id)
         if target_user.current_sid:
             await self._sio.emit_new_follower(
                 target_sid=target_user.current_sid,
@@ -332,7 +334,7 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        updated_user = await UserRepositorty.unfollow(
+        updated_user = await UserRepository.unfollow(
             request.db_session, user_id, target_id
         )
         return json_response({"updated_user": updated_user.to_json(safe=True)})
@@ -347,7 +349,7 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        target_followings = await UserRepositorty.get_followings(
+        target_followings = await UserRepository.get_followings(
             request.db_session, target_id, pagination
         )
         self._logger.debug(
@@ -376,7 +378,7 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        target_followers = await UserRepositorty.get_followers(
+        target_followers = await UserRepository.get_followers(
             request.db_session, target_id, pagination
         )
         self._logger.debug(
@@ -413,7 +415,7 @@ class UsersController:
             raise BadRequestError(
                 "You can not upgrade role to OWNER using this request"
             )
-        target_user = await UserRepositorty.get_by_id_with_relations(request.db_session, target_id)
+        target_user = await UserRepository.get_by_id_with_relations(request.db_session, target_id)
         if not target_user:
             raise UserNotFoundError(target_id)
         if request.user_id == target_id:
@@ -421,12 +423,12 @@ class UsersController:
         if not target_user.is_registration_completed:
             raise BadRequestError("The target user has not completed registration yet")
         # * End validation
-        await UserRepositorty.update_role(
+        await UserRepository.update_role(
             request.db_session,
             target_id=target_id,
             new_role=new_role,
         )
-        owner = await UserRepositorty.get_owner(request.db_session)
+        owner = await UserRepository.get_owner(request.db_session)
         self._logger.warning(
             f"OWNER({owner.username}) updated role for @{target_user.username} to ({new_role.name})"
         )
@@ -434,11 +436,11 @@ class UsersController:
 
     @authenticate()
     async def soft_delete(self, request: Request):
-        user = await UserRepositorty.get_by_id(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id(request.db_session, request.user_id)
         if user is None:
             raise UserNotFoundError(request.user_id)
         user_sid = user.current_sid
-        await UserRepositorty.soft_delete(
+        await UserRepository.soft_delete(
             session=request.db_session, target_id=user.id
         )
         await self._sio.on_user_deleted(user_sid)

@@ -21,7 +21,7 @@ from models.gender import Gender
 from models.otp import OtpDestiny
 from models.role import Role
 from repositories.otp_repository import OtpRepository
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from services.email_service import EmailService
 from services.tokens_service import TokensService
 from utils.my_validator.my_validator import ValidateField, validate_request_body
@@ -43,7 +43,7 @@ class RegistrationController:
             raise OtpSpamError(email)
 
         # * Check user exists
-        user = await UserRepositorty.get_by_email(request.db_session, email)
+        user = await UserRepository.get_by_email(request.db_session, email)
         if user is not None and user.is_registration_completed:
             raise UserWithEmailHasAlreadyCompletedRegistrationError(email_address=email)
 
@@ -71,7 +71,7 @@ class RegistrationController:
         email = body.get("email")
 
         # * Check user with registration completed
-        user = await UserRepositorty.get_by_email(request.db_session, email)
+        user = await UserRepository.get_by_email(request.db_session, email)
         if user is not None and user.is_registration_completed:
             raise UserWithEmailHasAlreadyCompletedRegistrationError(email_address=email)
 
@@ -91,7 +91,7 @@ class RegistrationController:
                 and ServerConfig.OWNER_KEY == owner_key
             ):
                 new_user_role = Role.owner
-            user = await UserRepositorty.create_new(
+            user = await UserRepository.create_new(
                 request.db_session, email, new_user_role
             )
             if new_user_role == Role.owner:
@@ -103,7 +103,7 @@ class RegistrationController:
                     and ServerConfig.OWNER_KEY
                     and ServerConfig.OWNER_KEY == owner_key
                 ):
-                    user = await UserRepositorty.update_role(
+                    user = await UserRepository.update_role(
                         request.db_session,
                         target_id=user.id,
                         new_role=Role.owner,
@@ -163,7 +163,7 @@ class RegistrationController:
         # * Find the user by id
         user_id = request.user_id
 
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
         if user is None:
             raise UserNotFoundError(user_id)
         if user is not None and user.is_registration_completed:
@@ -171,13 +171,13 @@ class RegistrationController:
 
         # * Check username is unique
         if (
-            await UserRepositorty.get_by_username(request.db_session, username)
+            await UserRepository.get_by_username(request.db_session, username)
             is not None
         ):
             raise UsernameIsAlreadyTakenError(username)
 
         # * Completing registration
-        updated_user = await UserRepositorty.complete_registration(
+        updated_user = await UserRepository.complete_registration(
             session=request.db_session,
             user_id=user_id,
             fullname=fullname,

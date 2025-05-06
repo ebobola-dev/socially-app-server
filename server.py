@@ -12,6 +12,7 @@ from config.paths import Paths
 from config.server_config import ServerConfig
 from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
+from controllers.comments_controller import CommentsController
 from controllers.middlewares import Middlewares
 from controllers.posts_controller import PostsController
 from controllers.registration_controller import RegistrationController
@@ -98,6 +99,10 @@ async def main():
         logger=MyLogger.get_logger("Posts"),
         main_sio_namespace=main_sio_namespace,
     )
+    comments_controller = CommentsController(
+        logger=MyLogger.get_logger("Commetns"),
+        main_sio_namespace=main_sio_namespace,
+    )
 
     app.add_routes(
         [
@@ -145,12 +150,17 @@ async def main():
             web.get(Paths.ApkUpdates.GET_MANY, apk_updates_controller.get_many),
             web.get(Paths.ApkUpdates.DOWNLOAD, apk_updates_controller.download),
             web.delete(Paths.ApkUpdates.DELETE, apk_updates_controller.delete),
-
             web.get(Paths.Posts.GET_ALL, posts_controller.get_all),
             web.get(Paths.Posts.GET_ONE, posts_controller.get_one),
             web.delete(Paths.Posts.DELETE, posts_controller.delete),
             web.post(Paths.Posts.CREATE, posts_controller.create),
             web.get(Paths.Posts.GET_IMAGE, posts_controller.get_post_image),
+            web.post(Paths.Posts.LIKE, posts_controller.like),
+            web.delete(Paths.Posts.UNLIKE, posts_controller.unlike),
+
+            web.get(Paths.Posts.Comments.GET_ALL, comments_controller.get_all),
+            web.post(Paths.Posts.Comments.CREATE, comments_controller.add),
+            web.delete(Paths.Posts.Comments.DELETE, comments_controller.delete),
         ]
     )
 

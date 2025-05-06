@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     String,
+    inspect,
 )
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
@@ -82,3 +83,19 @@ class Post(BaseModel):
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
+
+    def to_json(self, detect_is_liked_user_id: str | None = None):
+        json_view = super().to_json(safe=False, short=False)
+        json_view['author'] = self.author.to_json(short=True)
+
+        liked_ids = tuple(map(lambda user: user.id, self.liked_by))
+        json_view['likes_count'] = len(liked_ids)
+        if detect_is_liked_user_id:
+            json_view['is_liked'] = detect_is_liked_user_id in liked_ids
+
+        insp = inspect(self)
+        comments = insp.attrs.comments.loaded_value
+        if isinstance(comments, list):
+            json_view['comments_count'] = len(comments)
+
+        return json_view

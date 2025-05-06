@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from logging import Logger
 
@@ -11,6 +12,8 @@ from models.exceptions.api_exceptions import (
     BadImageFileExtError,
     ForbiddenError,
     ImageIsTooLargeError,
+    InvalidImageError,
+    PostIdNotSpecifiedError,
     PostNoImagesError,
     PostNotFoundError,
     ToManyImagesInPostError,
@@ -20,6 +23,7 @@ from models.pagination import Pagination
 from models.post import Post
 from repositories.post_repository import PostRepository
 from services.file_service import FileService
+from utils.image_utils import ImageUtils, PillowValidatationResult
 from utils.my_validator.my_validator import ValidateField
 from utils.my_validator.rules import CanCreateInstanceRule
 from utils.sizes import SizeUtils
@@ -34,36 +38,33 @@ class PostsController:
     async def get_all(self, request: Request):
         pagination = Pagination.from_request(request)
         user_id = request.query.get("user_id")
-        self._logger.debug(f"[GET_ALL] pag: {pagination}, user_id: {user_id}\n")
-        posts: list[Post] = []
-        if user_id:
-            posts = await PostRepository.get_all_of_user(
-                session=request.db_session,
-                user_id=user_id,
-                pagination=pagination,
-            )
-        else:
-            posts = await PostRepository.get_all(
-                session=request.db_session,
-                pagination=pagination,
-            )
-        json_posts = tuple(map(lambda post: post.to_json(), posts))
-
-        return json_response(
-            data={
-                "count": len(posts),
-                "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
-                },
-                "users": json_posts,
-            }
+        posts = await PostRepository.get_all(
+            session=request.db_session,
+            user_id=user_id,
+            pagination=pagination,
         )
+
+        json_posts = tuple(
+            map(
+                lambda post: post.to_json(detect_is_liked_user_id=request.user_id),
+                posts,
+            )
+        )
+        json_result = {
+            "count": len(posts),
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+            },
+        }
+        if user_id:
+            json_result['user_id'] = user_id
+        json_result["posts"] = json_posts
+        return json_response(data=json_result)
 
     @authenticate()
     async def get_one(self, request: Request):
         post_id = request.match_info["post_id"]
-        self._logger.debug(f"[GET_ONE] post_id: {post_id}\n")
         post = await PostRepository.get_by_id_with_relations(
             session=request.db_session,
             post_id=post_id,
@@ -71,13 +72,11 @@ class PostsController:
         )
         if not post:
             raise PostNotFoundError(post_id)
-        return json_response(data=post.to_json())
+        return json_response(data=post.to_json(detect_is_liked_user_id=request.user_id))
 
     @authenticate()
     @content_type_is_multipart()
     async def create(self, request: Request):
-        self._logger.debug("[CREATE]")
-
         reader = await request.multipart()
         text_content: str = ""
         images = []
@@ -115,6 +114,17 @@ class PostsController:
                             raise ImageIsTooLargeError()
                         image_file_buffer.write(chunk)
                     image_file_buffer.seek(0)
+                    pillow_validation_result = await asyncio.to_thread(
+                        ImageUtils.is_valid_by_pillow, image_file_buffer
+                    )
+                    is_valid_by_filetype = await asyncio.to_thread(
+                        ImageUtils.is_valid_by_filetype, image_file_buffer
+                    )
+                    if (
+                        not is_valid_by_filetype
+                        or pillow_validation_result == PillowValidatationResult.invalid
+                    ):
+                        raise InvalidImageError(field_name="image", filename=filename)
                     images.append(
                         {
                             "index": current_index,
@@ -155,8 +165,7 @@ class PostsController:
     async def delete(self, request: Request):
         post_id = request.query.get("post_id")
         if not post_id:
-            raise ValidationError({"post_id": "must be specified in query"})
-        self._logger.debug(f"[DELETE] post_id: {post_id}\n")
+            raise PostIdNotSpecifiedError()
         post = await PostRepository.get_by_id(
             session=request.db_session,
             post_id=post_id,
@@ -175,8 +184,6 @@ class PostsController:
     async def get_post_image(self, request: Request):
         post_id = request.match_info.get("post_id")
         image_index = request.query.get("index")
-        if not post_id:
-            raise ValidationError({"post_id": "must be specified in query"})
         ValidateField(field_name="index", rules=[CanCreateInstanceRule(int)])(
             image_index
         )
@@ -200,3 +207,33 @@ class PostsController:
             image_ext=image_ext,
         )
         return FileResponse(image_path)
+
+    @authenticate()
+    async def like(self, request: Request):
+        post_id = request.query.get("post_id")
+        self._logger.debug(f"[LIKES] post_id: {post_id}\n")
+        if not post_id:
+            raise PostIdNotSpecifiedError()
+        liked_post = await PostRepository.like(
+            session=request.db_session,
+            target_post_id=post_id,
+            user_id=request.user_id,
+        )
+        return json_response(
+            data=liked_post.to_json(detect_is_liked_user_id=request.user_id)
+        )
+
+    @authenticate()
+    async def unlike(self, request: Request):
+        post_id = request.query.get("post_id")
+        self._logger.debug(f"[LIKES] post_id: {post_id}\n")
+        if not post_id:
+            raise PostIdNotSpecifiedError()
+        updated_post = await PostRepository.unlike(
+            session=request.db_session,
+            target_post_id=post_id,
+            user_id=request.user_id,
+        )
+        return json_response(
+            data=updated_post.to_json(detect_is_liked_user_id=request.user_id)
+        )

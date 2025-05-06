@@ -56,3 +56,11 @@ class Paths:
         DELETE = _base_path
         GET_ONE = f"{_base_path}/{{post_id}}"
         GET_IMAGE = f"{_base_path}/{{post_id}}/images"
+        LIKE = f"{_base_path}/likes"
+        UNLIKE = f"{_base_path}/likes"
+
+        class Comments:
+            _base_path = f"{_base_api_path}/posts/{{post_id}}/comments"
+            GET_ALL = _base_path
+            CREATE = _base_path
+            DELETE = f"{_base_api_path}/posts/comments"

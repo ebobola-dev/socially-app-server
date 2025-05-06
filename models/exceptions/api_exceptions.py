@@ -201,7 +201,7 @@ class OwnerNotExistError(ValidationError):
 
 
 class ImageIsTooLargeError(BadRequestError):
-    def __init__(self, request_content_length: str = '?'):
+    def __init__(self, request_content_length: str = "?"):
         str_size = "?"
         if request_content_length.isdigit():
             str_size = SizeUtils.bytes_to_human_readable(int(request_content_length))
@@ -351,16 +351,25 @@ class UserDoesNotHaveExternalAvatarImageError(BadRequestError):
     def __init__(self, username: str):
         super().__init__(f"Target user does not have an external avatar (@{username})")
 
+
 class PostNoImagesError(BadRequestError):
     def __init__(self):
         super().__init__("The post must contain at least one image")
 
+
 class ToManyImagesInPostError(BadRequestError):
     def __init__(self):
-        super().__init__(f"Post can contain no more that {ServerConfig.MAX_IMAGES_IN_POST} images")
+        super().__init__(
+            f"Post can contain no more that {ServerConfig.MAX_IMAGES_IN_POST} images"
+        )
+
+
 class ToManyImagesInMessageError(BadRequestError):
     def __init__(self):
-        super().__init__(f"Message can contain no more that {ServerConfig.MAX_IMAGES_IN_MESSAGE} images")
+        super().__init__(
+            f"Message can contain no more that {ServerConfig.MAX_IMAGES_IN_MESSAGE} images"
+        )
+
 
 class PostNotFoundError(BadRequestError):
     def __init__(self, post_id: str):
@@ -368,3 +377,58 @@ class PostNotFoundError(BadRequestError):
             server_message=f"Could not found post with id ({post_id})",
             global_errors=["Post not found"],
         )
+
+
+class PostIdNotSpecifiedError(ValidationError):
+    def __init__(
+        self,
+        field_name: str = "post_id",
+        error_text: str = "must be specified in query",
+    ):
+        fc_error = {field_name: error_text}
+        super().__init__(field_specific_erros=fc_error)
+
+
+class CommentIdNotSpecifiedError(ValidationError):
+    def __init__(
+        self,
+        field_name: str = "comment_id",
+        error_text: str = "must be specified in query",
+    ):
+        fc_error = {field_name: error_text}
+        super().__init__(field_specific_erros=fc_error)
+
+
+class InvalidImageError(ValidationError):
+    def __init__(self, filename: str, field_name: str = "image"):
+        fc_error = {field_name: f"invalid image file ({filename})"}
+        super().__init__(fc_error)
+
+
+class AlreadyLikedError(BadRequestError):
+    def __init__(self, user_id: str, post_id: str):
+        super().__init__(
+            server_message=f"User({user_id}) already liked post({post_id})",
+            global_errors=["You are already liked the target post"],
+        )
+
+
+class NotLikedAnywayError(BadRequestError):
+    def __init__(self, user_id: str, post_id: str):
+        super().__init__(
+            server_message=f"User({user_id}) not liked post({post_id}) anyway",
+            global_errors=["You are not liked the target post anyway"],
+        )
+
+
+class CommentNotFoundError(BadRequestError):
+    def __init__(self, comment_id: str):
+        super().__init__(
+            server_message=f"Could not found comment with id ({comment_id})",
+            global_errors=["Comment not found"],
+        )
+
+
+class ForbiddenToDeleteCommentError(ForbiddenError):
+    def __init__(self, one_global_error="You can't delete someone else's post"):
+        super().__init__("Forbidden to delete comment", [one_global_error])

@@ -17,7 +17,7 @@ from models.exceptions.api_exceptions import (
     ValidationError,
 )
 from models.role import Role
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from services.tokens_service import TokensService
 from utils.my_validator.exceptions import MyValidatorError
 
@@ -49,7 +49,7 @@ def authenticate():
             try:
                 data = _get_access_token_data(request.headers.get("authorization"))
                 user_id = data.get("id")
-                user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+                user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
                 if not user:
                     raise UnauthorizedError()
                 request.user_id = user_id
@@ -120,7 +120,7 @@ def registration_completed():
     def decorator(handler):
         @wraps(handler)
         async def wrapper(self, request: Request):
-            user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
+            user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
             if not user:
                 raise UnauthorizedError()
             if not user.is_registration_completed:
@@ -142,7 +142,7 @@ def owner_role():
                     input_role=request.user_role,
                 )
             # ? На всякий случай, ведь я криворукая обезъяна
-            existing_owner = await UserRepositorty.get_owner(request.db_session)
+            existing_owner = await UserRepository.get_owner(request.db_session)
             if not existing_owner:
                 # self._logger.warning(f'Owner does not exists yet, but user role in token is OWNER')
                 raise ForbiddenForRoleError(
@@ -190,13 +190,13 @@ class Middlewares:
             result: Response = await handler(request)
             handle_time = time() - start_time
             self._logger.info(
-                f"[{ip}] {request.path} -> {result.status} ({handle_time:.2f} s)\n"
+                f"[{ip}] [{request.method}] {request.path} -> {result.status} ({handle_time:.2f} s)\n"
             )
             return result
         except ApiError as api_error:
             handle_time = time() - start_time
             self._logger.error(
-                f"[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n"
+                f"[{ip}] [{request.method}] {request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n"
             )
             return json_response(
                 status=api_error.response_status_code,
@@ -210,7 +210,7 @@ class Middlewares:
                 }
             )
             self._logger.error(
-                f"[{request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n"
+                f"[{ip}] [{request.method}] {request.path} -> {api_error.response_status_code} ({handle_time:.2f} s)] {api_error.server_message}\n"
             )
             return json_response(
                 status=api_error.response_status_code,
@@ -224,7 +224,7 @@ class Middlewares:
                 response_status_code=status_code, global_errors=[str(http_error)]
             )
             self._logger.error(
-                f"[{request.path} -> {status_code}] {type(http_error).__name__} {http_error}\n"
+                f"[{ip}] [{request.method}] {request.path} -> {status_code} {type(http_error).__name__} {http_error}\n"
             )
             return json_response(
                 status=api_error.response_status_code,
@@ -234,7 +234,7 @@ class Middlewares:
             handle_time = time() - start_time
             err = ApiError()
             self._logger.exception(
-                f"[{request.path} -> {err.response_status_code} ({handle_time:.2f} s)] Unexcepted error: {unexcepted_error}\n"
+                f"[{ip}] [{request.method}] {request.path} -> {err.response_status_code} ({handle_time:.2f} s)] Unexcepted error: {unexcepted_error}\n"
             )
             return json_response(
                 status=err.response_status_code,

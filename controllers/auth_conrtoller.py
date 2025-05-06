@@ -20,7 +20,7 @@ from models.exceptions.api_exceptions import (
 )
 from models.otp import OtpDestiny
 from repositories.otp_repository import OtpRepository
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from services.email_service import EmailService
 from services.tokens_service import TokensService
 from utils.my_validator.my_validator import ValidateField, validate_request_body
@@ -43,7 +43,7 @@ class AuthConrtoller:
         username = body.get("username")
         password = body.get("password")
 
-        user = await UserRepositorty.get_by_username(request.db_session, username)
+        user = await UserRepository.get_by_username(request.db_session, username)
         if user is None:
             raise IncorrectLoginDataError(
                 server_message=f"Could not found user with username @{username}"
@@ -98,7 +98,7 @@ class AuthConrtoller:
         if saved_refresh_token is None or saved_refresh_token.value != refresh_token:
             raise UnauthorizedError()
 
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
         if not user:
             raise UnauthorizedError()
 
@@ -125,9 +125,9 @@ class AuthConrtoller:
     @authenticate()
     @device_id_specified()
     async def logout(self, request: Request) -> Response:
-        user = await UserRepositorty.get_by_id_with_relations(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
         await self._sio.on_logout(user.current_sid)
-        await UserRepositorty.set_current_sid(
+        await UserRepository.set_current_sid(
             session=request.db_session,
             user_id=user.id,
             new_sid=None,
@@ -162,12 +162,12 @@ class AuthConrtoller:
         if reset_type == "e":
             email = request.query.get("email")
             ValidateField.email()(email)
-            user = await UserRepositorty.get_by_email(request.db_session, email)
+            user = await UserRepository.get_by_email(request.db_session, email)
             specified_data = email
         else:
             username = request.query.get("username")
             ValidateField.username()(username)
-            user = await UserRepositorty.get_by_username(request.db_session, username)
+            user = await UserRepository.get_by_username(request.db_session, username)
             specified_data = username
 
         if user is None:
@@ -222,12 +222,12 @@ class AuthConrtoller:
         if reset_type == "e":
             email = request.query.get("email")
             ValidateField.email()(email)
-            user = await UserRepositorty.get_by_email(request.db_session, email)
+            user = await UserRepository.get_by_email(request.db_session, email)
             specified_data = email
         else:
             username = request.query.get("username")
             ValidateField.username()(username)
-            user = await UserRepositorty.get_by_username(request.db_session, username)
+            user = await UserRepository.get_by_username(request.db_session, username)
             specified_data = username
 
         if user is None:

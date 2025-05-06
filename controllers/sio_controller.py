@@ -10,7 +10,7 @@ from database.database import Database
 from models.sio.authorize_error import AuthorizeError
 from models.sio.sio_ack import SioAck
 from models.sio.sio_session import AuthorizedSioSession, SioSession
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from services.tokens_service import TokensService
 from utils.serialize_util import serialize_value
 
@@ -69,7 +69,7 @@ class SioController(AsyncNamespace):
             token_data = TokensService.decode_access(access_token)
             user_id = token_data.get("id")
             user_role = token_data.get("role")
-            user = await UserRepositorty.get_by_id_with_relations(
+            user = await UserRepository.get_by_id_with_relations(
                 session=db_session,
                 user_id=user_id,
             )
@@ -128,7 +128,7 @@ class SioController(AsyncNamespace):
             # * Set user disconnected
             if isinstance(session, AuthorizedSioSession):
                 try:
-                    updated_user = await UserRepositorty.set_current_sid(
+                    updated_user = await UserRepository.set_current_sid(
                         db_session, session.user_id, new_sid=None
                     )
                     await db_session.commit()
@@ -153,7 +153,7 @@ class SioController(AsyncNamespace):
                     data=data,
                 )
                 await self.save_session(sid, authorized_session)
-                await UserRepositorty.set_current_sid(
+                await UserRepository.set_current_sid(
                     session=db_session,
                     user_id=authorized_session.user_id,
                     new_sid=sid,
@@ -181,7 +181,7 @@ class SioController(AsyncNamespace):
         # * Set user offline
         async with Database.session_maker() as db_session:
             try:
-                updated_user = await UserRepositorty.toggle_online(
+                updated_user = await UserRepository.toggle_online(
                     db_session, session.user_id, False
                 )
                 await db_session.commit()
@@ -206,7 +206,7 @@ class SioController(AsyncNamespace):
         # * Set user online
         async with Database.session_maker() as db_session:
             try:
-                await UserRepositorty.toggle_online(db_session, session.user_id, True)
+                await UserRepository.toggle_online(db_session, session.user_id, True)
                 await db_session.commit()
                 return SioAck.success().to_json()
             except Exception as error:

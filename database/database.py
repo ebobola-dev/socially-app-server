@@ -12,7 +12,7 @@ from models.exceptions.initalize_exceptions import (
 	DatabaseNotInitializedError,
 	UnableToInitializeServiceError,
 )
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 
 
 class Database:
@@ -68,7 +68,7 @@ class Database:
 			raise DatabaseNotInitializedError()
 		async with Database.session_maker() as session:
 			try:
-				await UserRepositorty.reset_sids(session)
+				await UserRepository.reset_sids(session)
 				await session.commit()
 			except Exception as _:
 				await session.rollback()

@@ -8,7 +8,7 @@ from database.database import Database
 from models.avatar_type import AvatarType
 from models.gender import Gender
 from models.role import Role
-from repositories.user_repository import UserRepositorty
+from repositories.user_repository import UserRepository
 from utils.date_generator import generate_date
 from utils.password_generator import generate_password
 
@@ -23,7 +23,7 @@ class TestUsers:
             return json.load(file)
 
     async def _check_user_exist(self, session: AsyncSession, email):
-        user = await UserRepositorty.get_by_email(session, email)
+        user = await UserRepository.get_by_email(session, email)
         return email, bool(user)
 
     async def _get_non_existent_users(
@@ -41,13 +41,13 @@ class TestUsers:
             try:
                 email = user_data.get("email_address")
                 # ? Registration
-                new_user = await UserRepositorty.create_new(
+                new_user = await UserRepository.create_new(
                     session=session,
                     email=email,
                     role=Role(user_data.get("role")),
                 )
                 # ? Complete registration
-                await UserRepositorty.complete_registration(
+                await UserRepository.complete_registration(
                     session=session,
                     user_id=new_user.id,
                     date_of_birth=generate_date(),
@@ -59,7 +59,7 @@ class TestUsers:
                 )
                 # ? Update avatar type
                 if user_data.get("avatar_type"):
-                    await UserRepositorty.update_avatar(
+                    await UserRepository.update_avatar(
                         session=session,
                         user_id=new_user.id,
                         new_avatar_type=AvatarType(user_data.get("avatar_type")),

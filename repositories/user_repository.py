@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from secrets import token_hex
 
 import bcrypt
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -26,7 +26,7 @@ from models.user import User
 from models.user_subscriptions import user_subscriptions
 
 
-class UserRepositorty:
+class UserRepository:
     @staticmethod
     async def get_by_id(
         session: AsyncSession, user_id: str, include_deleted: bool = False
@@ -92,7 +92,7 @@ class UserRepositorty:
         session: AsyncSession, email: str, role: Role = Role.user
     ) -> User:
         if role == Role.owner:
-            existing_owner = await UserRepositorty.get_owner(session)
+            existing_owner = await UserRepository.get_owner(session)
             if existing_owner:
                 raise OwnerAlreadyRegisteredError()
         new_user = User.new(email, role)
@@ -188,7 +188,7 @@ class UserRepositorty:
     async def update_password(
         session: AsyncSession, user_id: str, new_password: str
     ) -> User:
-        user: User | None = await UserRepositorty.get_by_id(
+        user: User | None = await UserRepository.get_by_id(
             session=session, user_id=user_id
         )
         if user is None:
@@ -209,10 +209,10 @@ class UserRepositorty:
     async def follow(session: AsyncSession, subscriber_id: str, target_id: str) -> User:
         if subscriber_id == target_id:
             raise CantFollowUnlollowYouselfError()
-        subscriber = await UserRepositorty.get_by_id(
+        subscriber = await UserRepository.get_by_id(
             session=session, user_id=subscriber_id
         )
-        target = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not subscriber:
             raise UserNotFoundError(subscriber_id)
         if not target:
@@ -237,10 +237,10 @@ class UserRepositorty:
     ) -> User:
         if subscriber_id == target_id:
             raise CantFollowUnlollowYouselfError()
-        subscriber = await UserRepositorty.get_by_id(
+        subscriber = await UserRepository.get_by_id(
             session=session, user_id=subscriber_id
         )
-        target = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target = await UserRepository.get_by_id(session=session, user_id=target_id, include_deleted=True)
         if not subscriber:
             raise UserNotFoundError(subscriber_id)
         if not target:
@@ -274,7 +274,7 @@ class UserRepositorty:
             fullname = ""
         if about_me is None:
             about_me = ""
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         if user.is_registration_completed:
@@ -306,7 +306,7 @@ class UserRepositorty:
         new_avatar_type: AvatarType,
         new_avatar_id: str | None = None,
     ) -> User:
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = new_avatar_type
@@ -321,7 +321,7 @@ class UserRepositorty:
 
     @staticmethod
     async def delete_avatar(session: AsyncSession, user_id: str) -> User:
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = None
@@ -338,7 +338,7 @@ class UserRepositorty:
     async def toggle_online(
         session: AsyncSession, user_id: str, new_is_online_value: bool
     ) -> User:
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         if user.is_online and not new_is_online_value:
@@ -356,11 +356,11 @@ class UserRepositorty:
     async def set_current_sid(
         session: AsyncSession, user_id: str, new_sid: str | None
     ) -> User:
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         if not new_sid:
-            await UserRepositorty.toggle_online(session, user_id, False)
+            await UserRepository.toggle_online(session, user_id, False)
         user.current_sid = new_sid
         try:
             await session.flush()
@@ -381,7 +381,7 @@ class UserRepositorty:
             raise NothingToUpdateError(
                 server_message=f"nothing to update, {update_data} -> {new_data}",
             )
-        user: User = await UserRepositorty.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
         if not user:
             raise UserNotFoundError(user_id)
         for field, value in new_data.items():
@@ -398,7 +398,7 @@ class UserRepositorty:
     async def get_followings(
         session: AsyncSession, target_id: str, pagination: Pagination
     ) -> list[User]:
-        target_user = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target_user = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not target_user:
             raise UserNotFoundError(target_id)
         query = (
@@ -415,7 +415,7 @@ class UserRepositorty:
     async def get_followers(
         session: AsyncSession, target_id: str, pagination: Pagination
     ) -> list[User]:
-        target_user = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target_user = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not target_user:
             raise UserNotFoundError(target_id)
         query = (
@@ -430,11 +430,11 @@ class UserRepositorty:
 
     @staticmethod
     async def update_role(session: AsyncSession, target_id, new_role: Role) -> User:
-        target_user: User | None = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target_user: User | None = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not target_user:
             raise UserNotFoundError(target_id)
         if new_role == Role.owner:
-            existing_owner = await UserRepositorty.get_owner(session)
+            existing_owner = await UserRepository.get_owner(session)
             if existing_owner:
                 raise OwnerAlreadyRegisteredError()
         target_user.role = new_role
@@ -453,7 +453,7 @@ class UserRepositorty:
 
     @staticmethod
     async def soft_delete(session: AsyncSession, target_id: str) -> User:
-        target_user: User | None = await UserRepositorty.get_by_id(session=session, user_id=target_id)
+        target_user: User | None = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not target_user:
             raise UserNotFoundError(target_id)
         if target_user.role == Role.owner:
@@ -466,7 +466,7 @@ class UserRepositorty:
         target_user.email_address = deleted_tag
         target_user.username = deleted_tag
         target_user.fullname = ""
-        target_user.date_of_birth = None
+        target_user.date_of_birth = date(1000, 1, 1)
         target_user.gender = None
         target_user.about_me = ""
         target_user.avatar_type = None
@@ -476,6 +476,9 @@ class UserRepositorty:
         target_user.last_seen = None
 
         target_user.deleted_at = datetime.now(timezone.utc)
+
+        await session.execute(delete(user_subscriptions).where(user_subscriptions.c.follower_id == target_id))
+
         await session.flush()
         await session.refresh(target_user)
         return target_user

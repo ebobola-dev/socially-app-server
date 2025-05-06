@@ -49,7 +49,9 @@ class Comment(BaseModel):
         passive_deletes=True,
     )
 
-    post: Mapped["Post"] = relationship("Post", back_populates="comments", passive_deletes=True)
+    post: Mapped["Post"] = relationship(
+        "Post", back_populates="comments", passive_deletes=True
+    )
 
     reply_to: Mapped["Comment"] = relationship(
         "Comment",
@@ -58,5 +60,28 @@ class Comment(BaseModel):
         passive_deletes=True,
     )
 
+    @staticmethod
+    def new(
+        author_id: str,
+        post_id: str,
+        text_content: str,
+        reply_to_comment_id: str | None = None,
+    ):
+        return Comment(
+            author_id=author_id,
+            post_id=post_id,
+            text_content=text_content,
+            reply_to_comment_id=reply_to_comment_id,
+        )
+
     def __repr__(self):
         return f"<Comment>({self.id}, {self.created_at})"
+
+    def to_json(self, include_reply=False):
+        json_view = super().to_json(safe=False, short=False)
+        json_view["author"] = self.author.to_json(short=True)
+        if include_reply:
+            json_view["reply_to"] = None
+            if self.reply_to is not None:
+                json_view["reply_to"] = self.reply_to.to_json()
+        return json_view
