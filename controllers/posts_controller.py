@@ -53,12 +53,12 @@ class PostsController:
         json_result = {
             "count": len(posts),
             "pagination": {
-                "page": pagination.page,
-                "per_page": pagination.per_page,
+                "offset": pagination.offset,
+                "limit": pagination.limit,
             },
         }
         if user_id:
-            json_result['user_id'] = user_id
+            json_result["user_id"] = user_id
         json_result["posts"] = json_posts
         return json_response(data=json_result)
 
@@ -172,12 +172,13 @@ class PostsController:
         )
         if not post:
             raise PostNotFoundError(post_id)
-        if post.author_id != request.user_id:
+        if post.author_id != request.user_id and not request.user_role.is_owner:
             raise ForbiddenError(global_errors=["You can't delete someone else's post"])
         await FileService.delete_all_post_images(post_id=post_id)
         deleted_post = await PostRepository.soft_delete(
             session=request.db_session, target_post_id=post_id
         )
+        await self._sio.emit_post_deleted(post_id=post_id)
         return json_response(data=deleted_post.to_json())
 
     @authenticate()
@@ -219,6 +220,9 @@ class PostsController:
             target_post_id=post_id,
             user_id=request.user_id,
         )
+        await self._sio.emit_post_likes_count_changed(
+            post_id=post_id, new_likes_count=len(liked_post.liked_by)
+        )
         return json_response(
             data=liked_post.to_json(detect_is_liked_user_id=request.user_id)
         )
@@ -233,6 +237,9 @@ class PostsController:
             session=request.db_session,
             target_post_id=post_id,
             user_id=request.user_id,
+        )
+        await self._sio.emit_post_likes_count_changed(
+            post_id=post_id, new_likes_count=len(updated_post.liked_by)
         )
         return json_response(
             data=updated_post.to_json(detect_is_liked_user_id=request.user_id)

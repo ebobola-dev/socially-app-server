@@ -16,6 +16,7 @@ from models.exceptions.api_exceptions import (
 from models.pagination import Pagination
 from repositories.comments_repository import CommentsRepository
 from repositories.post_repository import PostRepository
+from repositories.user_repository import UserRepository
 from utils.my_validator.my_validator import ValidateField, validate_request_body
 from utils.my_validator.rules import IsInstanceRule, LengthRule
 
@@ -52,8 +53,8 @@ class CommentsController:
             data={
                 "count": len(json_comments),
                 "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
+                    "offset": pagination.offset,
+                    "limit": pagination.limit,
                 },
                 "post_id": post_id,
                 "comments": json_comments,
@@ -69,10 +70,10 @@ class CommentsController:
             session=request.db_session,
             comment_id=comment_id,
         )
-        self._logger.debug(f'comment: {comment}, bool: {bool(comment)}')
+        self._logger.debug(f"comment: {comment}, bool: {bool(comment)}")
         if not comment:
             raise CommentNotFoundError(comment_id)
-        post = await PostRepository.get_by_id(
+        post = await PostRepository.get_by_id_with_relations(
             session=request.db_session, post_id=comment.post_id
         )
         if not post:
@@ -81,12 +82,16 @@ class CommentsController:
         is_our_post = post.author_id == request.user_id
         is_our_comment = comment.author_id == request.user_id
 
-        if not is_our_post and not is_our_comment:
+        if not is_our_post and not is_our_comment and not request.user_role.is_owner:
             raise ForbiddenToDeleteCommentError()
 
         await CommentsRepository.hard_delete(
             session=request.db_session,
             target_comment_id=comment_id,
+        )
+        await self._sio.emit_comment_deleted(post_id=post.id, comment_id=comment_id)
+        await self._sio.emit_post_comments_count_changed(
+            post_id=post.id, new_comments_count=len(post.comments)
         )
         return json_response()
 
@@ -111,7 +116,7 @@ class CommentsController:
     )
     async def add(self, request: Request):
         post_id = request.match_info.get("post_id")
-        target_post = await PostRepository.get_by_id(
+        target_post = await PostRepository.get_by_id_with_relations(
             session=request.db_session,
             post_id=post_id,
         )
@@ -121,7 +126,7 @@ class CommentsController:
         text_content = body.get("text_content")
         reply_to_comment_id = body.get("reply_to_comment_id")
         if reply_to_comment_id:
-            reply_to_comment = await CommentsRepository.get_by_id(
+            reply_to_comment = await CommentsRepository.get_by_id_with_relations(
                 session=request.db_session, comment_id=reply_to_comment_id
             )
             if not reply_to_comment:
@@ -143,5 +148,17 @@ class CommentsController:
             session=request.db_session,
             new_comment=new_comment,
         )
-
-        return json_response(data=new_comment.to_json())
+        post_author = await UserRepository.get_by_id(
+            session=request.db_session,
+            user_id=target_post.author_id,
+        )
+        await self._sio.emit_new_comment(
+            new_comment=new_comment,
+            post_author_sid=post_author.current_sid,
+        )
+        await self._sio.emit_post_comments_count_changed(
+            post_id=post_id, new_comments_count=len(target_post.comments)
+        )
+        return json_response(
+            data=new_comment.to_json(include_reply=reply_to_comment_id is not None)
+        )

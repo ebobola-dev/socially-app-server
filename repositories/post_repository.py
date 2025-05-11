@@ -77,8 +77,8 @@ class PostRepository:
                 selectinload(Post.liked_by).load_only(User.id),
             )
             .offset(pagination.offset)
-            .limit(pagination.per_page)
-            .order_by(Post.created_at)
+            .limit(pagination.limit)
+            .order_by(Post.created_at.desc())
         )
         if not include_deleted:
             query = query.where(Post.deleted_at.is_(None))
@@ -117,19 +117,19 @@ class PostRepository:
         target_post = await PostRepository.get_by_id_with_relations(
             session=session, post_id=target_post_id
         )
-        target_user = await UserRepository.get_by_id(
+        user = await UserRepository.get_by_id(
             session=session, user_id=user_id, include_deleted=True
         )
         if not target_post:
             raise PostNotFoundError(target_post_id)
-        if not target_user:
+        if not user:
             raise UserNotFoundError(user_id)
-        if target_user in target_post.liked_by:
+        if user in target_post.liked_by:
             raise AlreadyLikedError(user_id, target_post_id)
-        target_post.liked_by.append(target_user)
+        target_post.liked_by.append(user)
         try:
             await session.flush()
-            await session.refresh(target_user)
+            await session.refresh(user)
             return target_post
         except Exception as error:
             await session.rollback()
@@ -140,19 +140,19 @@ class PostRepository:
         target_post = await PostRepository.get_by_id_with_relations(
             session=session, post_id=target_post_id
         )
-        target_user = await UserRepository.get_by_id(
+        user = await UserRepository.get_by_id(
             session=session, user_id=user_id, include_deleted=True
         )
         if not target_post:
             raise PostNotFoundError(target_post_id)
-        if not target_user:
+        if not user:
             raise UserNotFoundError(user_id)
-        if target_user not in target_post.liked_by:
+        if user not in target_post.liked_by:
             raise NotLikedAnywayError(user_id, target_post_id)
-        target_post.liked_by.remove(target_user)
+        target_post.liked_by.remove(user)
         try:
             await session.flush()
-            await session.refresh(target_user)
+            await session.refresh(user)
             return target_post
         except Exception as error:
             await session.rollback()

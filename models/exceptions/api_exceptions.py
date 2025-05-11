@@ -430,5 +430,5 @@ class CommentNotFoundError(BadRequestError):
 
 
 class ForbiddenToDeleteCommentError(ForbiddenError):
-    def __init__(self, one_global_error="You can't delete someone else's post"):
+    def __init__(self, one_global_error="You can't delete someone else's comment"):
         super().__init__("Forbidden to delete comment", [one_global_error])

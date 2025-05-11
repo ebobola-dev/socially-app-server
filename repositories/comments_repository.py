@@ -63,11 +63,11 @@ class CommentsRepository:
                     User.is_online,
                 ),
                 selectinload(Comment.post).load_only(Post.id),
-                selectinload(Comment.reply_to).load_only(Comment.id),
+                selectinload(Comment.reply_to),
             )
             .offset(pagination.offset)
-            .limit(pagination.per_page)
-            .order_by(Comment.created_at)
+            .limit(pagination.limit)
+            .order_by(Comment.created_at.desc())
         )
         result = await session.scalars(query)
         return result.all()

@@ -7,8 +7,10 @@ from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from socketio import AsyncNamespace
 
 from database.database import Database
+from models.comment import Comment
 from models.sio.authorize_error import AuthorizeError
 from models.sio.sio_ack import SioAck
+from models.sio.sio_rooms import SioRooms
 from models.sio.sio_session import AuthorizedSioSession, SioSession
 from repositories.user_repository import UserRepository
 from services.tokens_service import TokensService
@@ -161,6 +163,14 @@ class SioController(AsyncNamespace):
                 await db_session.commit()
                 self._logger.info(f"[{sid}] Successfuly authorized\n")
                 self._cancel_wait_authorization(sid)
+                await self.enter_room(
+                    sid=sid,
+                    room=SioRooms.get_authorized_room(),
+                )
+                await self.enter_room(
+                    sid=sid,
+                    room=SioRooms.get_personal_room(user_id=authorized_session.user_id),
+                )
                 return SioAck.success().to_json()
             except AuthorizeError as authorized_error:
                 self._logger.error(
@@ -216,6 +226,30 @@ class SioController(AsyncNamespace):
                 await db_session.rollback()
                 return SioAck.failed().to_json()
 
+    @check_authorization
+    async def on_join_to_post_room(
+        self, sid, data: dict | None = None, session: AuthorizedSioSession = None
+    ):
+        if not isinstance(data, dict):
+            return SioAck.failed(error_text="Post id must be specified")
+        post_id = data.get("post_id")
+        if post_id is None:
+            return SioAck.failed(error_text="Post id must be specified")
+        await self.enter_room(sid=sid, room=SioRooms.get_post_room(post_id=post_id))
+        return SioAck.success()
+
+    @check_authorization
+    async def on_leave_from_post_room(
+        self, sid, data: dict | None = None, session: AuthorizedSioSession = None
+    ):
+        if not isinstance(data, dict):
+            return SioAck.failed(error_text="Post id must be specified")
+        post_id = data.get("post_id")
+        if post_id is None:
+            return SioAck.failed(error_text="Post id must be specified")
+        await self.leave_room(sid=sid, room=SioRooms.get_post_room(post_id=post_id))
+        return SioAck.success()
+
     # * ------------------------ Emitters ------------------------
     async def on_logout(self, user_sid: str | None):
         if user_sid:
@@ -227,21 +261,93 @@ class SioController(AsyncNamespace):
 
     async def emit_user_is_offline(self, user_id: str, last_seen: datetime):
         await self.emit(
-            "user_is_offline",
-            {"user_id": user_id, "last_seen": serialize_value(last_seen)},
+            event="user_is_offline",
+            data={"user_id": user_id, "last_seen": serialize_value(last_seen)},
+            room=SioRooms.get_authorized_room(),
         )
 
     async def emit_user_is_online(self, user_id: str):
-        await self.emit("user_is_online", {"user_id": user_id})
+        await self.emit(
+            event="user_is_online",
+            data={"user_id": user_id},
+            room=SioRooms.get_authorized_room(),
+        )
 
     async def emit_new_follower(
         self,
-        target_sid: str,
+        target_sid: str | None,
         follower_id: str,
         follower_username: str,
     ):
+        if target_sid:
+            await self.emit(
+                event="new_follower",
+                data={
+                    "follower_id": follower_id,
+                    "follower_username": follower_username,
+                },
+                to=target_sid,
+            )
+
+    async def emit_new_comment(
+        self, new_comment: Comment, post_author_sid: str | None = None
+    ):
         await self.emit(
-            event="new_follower",
-            data={"follower_id": follower_id, "follower_username": follower_username},
-            to=target_sid,
+            "new_comment",
+            data={"new_comment": new_comment.to_json(include_reply=True)},
+            room=SioRooms.get_post_room(post_id=new_comment.post_id),
+        )
+        if post_author_sid:
+            await self.emit(
+                "new_comment_on_your_post",
+                data={"new_comment": new_comment.to_json(include_reply=True)},
+                to=post_author_sid,
+            )
+
+    async def emit_comment_deleted(
+        self,
+        post_id: str,
+        comment_id: str,
+    ):
+        await self.emit(
+            "comment_deleted",
+            data={
+                "comment_id": comment_id,
+                "post_id": post_id,
+            },
+            room=SioRooms.get_post_room(post_id=post_id),
+        )
+
+    async def emit_post_deleted(
+        self,
+        post_id: str,
+    ):
+        await self.emit(
+            "post_deleted",
+            data={
+                "post_id": post_id,
+            },
+            room=SioRooms.get_post_room(post_id=post_id),
+        )
+
+    async def emit_post_likes_count_changed(self, post_id: str, new_likes_count: int):
+        await self.emit(
+            "post_likes_count_changed",
+            data={
+                "post_id": post_id,
+                "new_likes_count": new_likes_count,
+            },
+            room=SioRooms.get_post_room(post_id=post_id),
+        )
+
+    async def emit_post_comments_count_changed(
+        self, post_id: str, new_comments_count: int
+    ):
+        await self.emit(
+            "post_comments_count_changed",
+            data={
+                "post_id": post_id,
+                "new_comments_count": new_comments_count,
+            },
+            room=SioRooms.get_post_room(post_id=post_id),
         )

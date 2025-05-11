@@ -4,31 +4,27 @@ from models.exceptions.api_exceptions import ValidationError
 
 
 class Pagination:
-    def __init__(self, page: int, per_page: int):
-        self.page = page
-        self.per_page = per_page
+    def __init__(self, offset: int, limit: int):
+        self.offset = offset
+        self.limit = limit
 
     @staticmethod
     def from_request(request: Request):
         try:
-            page = int(request.query.get("page", 1))
-            per_page = int(request.query.get("per_page", 10))
+            offset = int(request.query.get("offset", 0))
+            limit = int(request.query.get("limit", 10))
         except Exception as _:
             raise ValidationError("Invalid pagination data")
-        if page < 1 or per_page < 1:
+        if offset < 0 or limit < 1:
             raise ValidationError("Invalid pagination data")
-        return Pagination(page=page, per_page=per_page)
+        return Pagination(offset=offset, limit=limit)
 
     @staticmethod
     def default():
         return Pagination(
-            page=1,
-            per_page=10,
+            offset=0,
+            limit=10,
         )
 
     def __str__(self):
-        return f"<Pagination>(page: {self.page}, limit: {self.per_page})"
-
-    @property
-    def offset(self):
-        return (self.page - 1) * self.per_page
+        return f"<Pagination>(offset: {self.offset}, limit: {self.limit})"

@@ -149,7 +149,7 @@ class UserRepository:
                 selectinload(User.followers),
             )
             .offset(pagination.offset)
-            .limit(pagination.per_page)
+            .limit(pagination.limit)
         )
         result = await session.scalars(query)
         return result.all()
@@ -179,7 +179,7 @@ class UserRepository:
                 selectinload(User.followers),
             )
             .offset(pagination.offset)
-            .limit(pagination.per_page)
+            .limit(pagination.limit)
         )
         result = await session.scalars(query)
         return result.all()
@@ -406,7 +406,7 @@ class UserRepository:
             .join(user_subscriptions, user_subscriptions.c.following_id == User.id)
             .where(user_subscriptions.c.follower_id == target_id)
             .offset(pagination.offset)
-            .limit(pagination.per_page)
+            .limit(pagination.limit)
         )
         followings = (await session.execute(query)).scalars().all()
         return followings
@@ -423,7 +423,7 @@ class UserRepository:
             .join(user_subscriptions, user_subscriptions.c.follower_id == User.id)
             .where(user_subscriptions.c.following_id == target_id)
             .offset(pagination.offset)
-            .limit(pagination.per_page)
+            .limit(pagination.limit)
         )
         followings = (await session.execute(query)).scalars().all()
         return followings
