@@ -77,11 +77,18 @@ class Comment(BaseModel):
     def __repr__(self):
         return f"<Comment>({self.id}, {self.created_at})"
 
-    def to_json(self, include_reply=False):
+    def to_json(self, include_reply=False, detect_rels_for_user_id: str | None = None):
         json_view = super().to_json(safe=False, short=False)
-        json_view["author"] = self.author.to_json(short=True)
+        json_view["author"] = self.author.to_json(
+            short=True, detect_rels_for_user_id=detect_rels_for_user_id
+        )
         if include_reply:
             json_view["reply_to"] = None
             if self.reply_to is not None:
-                json_view["reply_to"] = self.reply_to.to_json()
+                json_view["reply_to"] = self.reply_to.to_json(
+                    detect_rels_for_user_id=detect_rels_for_user_id
+                )
+        if detect_rels_for_user_id:
+            json_view["is_our"] = detect_rels_for_user_id == self.author_id
+            json_view["is_our_post"] = detect_rels_for_user_id == self.post.author_id
         return json_view

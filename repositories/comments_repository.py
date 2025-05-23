@@ -1,7 +1,6 @@
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from models.comment import Comment
 from models.exceptions.api_exceptions import (
@@ -16,8 +15,11 @@ from models.user import User
 class CommentsRepository:
     @staticmethod
     async def get_by_id(session: AsyncSession, comment_id: str) -> Comment | None:
-        comment = await session.get(Comment, comment_id)
-        return comment
+        # comment = await session.get(Comment, comment_id)
+        # return comment
+        query = select(Comment).where(Comment.id == comment_id)
+        result = await session.scalars(query)
+        return result.first()
 
     @staticmethod
     async def get_by_id_with_relations(
@@ -27,17 +29,21 @@ class CommentsRepository:
             select(Comment)
             .where(Comment.id == comment_id)
             .options(
-                selectinload(Comment.author).load_only(
-                    User.id,
-                    User.username,
-                    User.fullname,
-                    User.avatar_type,
-                    User.avatar_id,
-                    User.deleted_at,
-                    User.is_online,
+                selectinload(Comment.author).options(
+                    load_only(
+                        User.id,
+                        User.username,
+                        User.fullname,
+                        User.avatar_type,
+                        User.avatar_key,
+                        User.deleted_at,
+                        User.is_online,
+                    ),
+                    selectinload(User.followers).load_only(User.id),
+                    selectinload(User.following).load_only(User.id),
                 ),
-                selectinload(Comment.post).load_only(Post.id),
-                selectinload(Comment.reply_to).load_only(Comment.id),
+                selectinload(Comment.post).load_only(Post.id, Post.author_id),
+                selectinload(Comment.reply_to),
             )
         )
         result = await session.scalars(query)
@@ -53,16 +59,20 @@ class CommentsRepository:
             select(Comment)
             .where(Comment.post_id == post_id)
             .options(
-                selectinload(Comment.author).load_only(
-                    User.id,
-                    User.username,
-                    User.fullname,
-                    User.avatar_type,
-                    User.avatar_id,
-                    User.deleted_at,
-                    User.is_online,
+                selectinload(Comment.author).options(
+                    load_only(
+                        User.id,
+                        User.username,
+                        User.fullname,
+                        User.avatar_type,
+                        User.avatar_key,
+                        User.deleted_at,
+                        User.is_online,
+                    ),
+                    selectinload(User.followers).load_only(User.id),
+                    selectinload(User.following).load_only(User.id),
                 ),
-                selectinload(Comment.post).load_only(Post.id),
+                selectinload(Comment.post).load_only(Post.id, Post.author_id),
                 selectinload(Comment.reply_to),
             )
             .offset(pagination.offset)
@@ -77,7 +87,6 @@ class CommentsRepository:
         session.add(new_comment)
         try:
             await session.flush()
-            await session.refresh(new_comment)
             return new_comment
         except Exception as error:
             await session.rollback()

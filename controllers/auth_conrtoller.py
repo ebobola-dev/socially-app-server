@@ -70,7 +70,7 @@ class AuthConrtoller:
             {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "user": user.to_json(safe=True),
+                "user": user.to_json(safe=True, detect_rels_for_user_id=user.id),
             }
         )
 
@@ -98,7 +98,9 @@ class AuthConrtoller:
         if saved_refresh_token is None or saved_refresh_token.value != refresh_token:
             raise UnauthorizedError()
 
-        user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
+        user = await UserRepository.get_by_id_with_relations(
+            request.db_session, user_id
+        )
         if not user:
             raise UnauthorizedError()
 
@@ -118,14 +120,16 @@ class AuthConrtoller:
             {
                 "access_token": new_access_token,
                 "refresh_token": new_refresh_token,
-                "user": user.to_json(safe=True),
+                "user": user.to_json(safe=True, detect_rels_for_user_id=user.id),
             }
         )
 
     @authenticate()
     @device_id_specified()
     async def logout(self, request: Request) -> Response:
-        user = await UserRepository.get_by_id_with_relations(request.db_session, request.user_id)
+        user = await UserRepository.get_by_id_with_relations(
+            request.db_session, request.user_id
+        )
         await self._sio.on_logout(user.current_sid)
         await UserRepository.set_current_sid(
             session=request.db_session,
@@ -137,8 +141,9 @@ class AuthConrtoller:
             user_id=user.id,
             device_id=request.device_id,
         )
+        await request.db_session.commit()
         self._logger.debug(f"@{user.username} has logged out")
-        return json_response()
+        raise UnauthorizedError()
 
     async def send_otp_to_reset_password(self, request: Request) -> Response:
         #! Need a type:
@@ -254,6 +259,6 @@ class AuthConrtoller:
             {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "user": user.to_json(safe=True),
+                "user": user.to_json(safe=True, detect_rels_for_user_id=user.id),
             }
         )

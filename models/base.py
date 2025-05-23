@@ -26,21 +26,17 @@ class BaseModel(AsyncAttrs, DeclarativeBase):
                 return False
             return True
 
+        def ga(key):
+            try:
+                return serialize_value(getattr(self, key))
+            except Exception as e:
+                raise Exception(f"SERIALIZE ERROR ON KEY (short: {short}): {key}") from e
+
         json_view = {
-            col.key: serialize_value(getattr(self, col.key))
+            col.key: ga(col.key)
             for col in self.__table__.columns
             if will_be_added(col.key)
         }
-
-        if (
-            not short
-            and hasattr(self, "__relationship_fields__")
-            and len(self.__relationship_fields__)
-        ):
-            for rel_field_key in self.__relationship_fields__:
-                json_view[rel_field_key] = tuple(
-                    obj.id for obj in getattr(self, rel_field_key)
-                )
 
         return json_view
 
@@ -58,15 +54,6 @@ def protected_from_json_fields(*field_names):
 def safe_fields(*field_names):
     def decorator(cls):
         cls.__safe_fields__ = field_names
-        return cls
-
-    return decorator
-
-
-# * [Class Decorator] For relationship fields, will be serialized as list of obj.id (rel_field = [obj, obj, obj] -> [obj.id, obj.id, obj.id])
-def relationship_fields(*field_names):
-    def decorator(cls):
-        cls.__relationship_fields__ = field_names
         return cls
 
     return decorator

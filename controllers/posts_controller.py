@@ -2,7 +2,7 @@ import asyncio
 from io import BytesIO
 from logging import Logger
 
-from aiohttp.web import FileResponse, Request, json_response
+from aiohttp.web import Request, json_response
 
 from config.length_requirements import LengthRequirements
 from config.server_config import ServerConfig
@@ -22,11 +22,15 @@ from models.exceptions.api_exceptions import (
 from models.pagination import Pagination
 from models.post import Post
 from repositories.post_repository import PostRepository
-from services.file_service import FileService
+from services.minio_service import Buckets, MinioService
 from utils.image_utils import ImageUtils, PillowValidatationResult
-from utils.my_validator.my_validator import ValidateField
-from utils.my_validator.rules import CanCreateInstanceRule
 from utils.sizes import SizeUtils
+
+
+# * потом придумаю куда это лучше вынести по красоте, пока блюём
+def parse_short_flag(query: dict[str, str]) -> bool:
+    raw = query.get("short", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 class PostsController:
@@ -38,6 +42,7 @@ class PostsController:
     async def get_all(self, request: Request):
         pagination = Pagination.from_request(request)
         user_id = request.query.get("user_id")
+        short = parse_short_flag(request.query)
         posts = await PostRepository.get_all(
             session=request.db_session,
             user_id=user_id,
@@ -46,7 +51,9 @@ class PostsController:
 
         json_posts = tuple(
             map(
-                lambda post: post.to_json(detect_is_liked_user_id=request.user_id),
+                lambda post: post.to_json(
+                    detect_rels_for_user_id=request.user_id, short=short
+                ),
                 posts,
             )
         )
@@ -72,7 +79,7 @@ class PostsController:
         )
         if not post:
             raise PostNotFoundError(post_id)
-        return json_response(data=post.to_json(detect_is_liked_user_id=request.user_id))
+        return json_response(data=post.to_json(detect_rels_for_user_id=request.user_id))
 
     @authenticate()
     @content_type_is_multipart()
@@ -131,6 +138,7 @@ class PostsController:
                             "ext": file_ext,
                             "content": image_file_buffer,
                             "size": total_size,
+                            "file_key": f"{current_index}{file_ext}",
                         }
                     )
 
@@ -150,23 +158,26 @@ class PostsController:
         new_post = Post.new(
             author_id=request.user_id,
             text_content=text_content,
-            image_exts=list(map(lambda img_data: img_data["ext"], images)),
+            image_keys=list(map(lambda img_data: img_data["file_key"], images)),
         )
         await PostRepository.add(session=request.db_session, new_post=new_post)
         self._logger.debug(f"New post: {new_post}")
 
-        await FileService.save_post_images(
-            post_id=new_post.id, images=images, logger=self._logger
-        )
+        for image in images:
+            await MinioService.save(
+                bucket=Buckets.posts,
+                key=f"{new_post.id}/{image['file_key']}",
+                bytes=image["content"],
+            )
 
-        return json_response(new_post.to_json())
+        return json_response(new_post.to_json(detect_rels_for_user_id=request.user_id))
 
     @authenticate()
     async def delete(self, request: Request):
         post_id = request.query.get("post_id")
         if not post_id:
             raise PostIdNotSpecifiedError()
-        post = await PostRepository.get_by_id(
+        post = await PostRepository.get_by_id_with_relations(
             session=request.db_session,
             post_id=post_id,
         )
@@ -174,40 +185,18 @@ class PostsController:
             raise PostNotFoundError(post_id)
         if post.author_id != request.user_id and not request.user_role.is_owner:
             raise ForbiddenError(global_errors=["You can't delete someone else's post"])
-        await FileService.delete_all_post_images(post_id=post_id)
         deleted_post = await PostRepository.soft_delete(
             session=request.db_session, target_post_id=post_id
         )
-        await self._sio.emit_post_deleted(post_id=post_id)
-        return json_response(data=deleted_post.to_json())
-
-    @authenticate()
-    async def get_post_image(self, request: Request):
-        post_id = request.match_info.get("post_id")
-        image_index = request.query.get("index")
-        ValidateField(field_name="index", rules=[CanCreateInstanceRule(int)])(
-            image_index
-        )
-        image_index = int(image_index)
-        post = await PostRepository.get_by_id(
-            session=request.db_session, post_id=post_id
-        )
-        if not post:
-            raise PostNotFoundError(post_id=post_id)
-        max_image_index = len(post.image_exts) - 1
-        if image_index < 0 or image_index > max_image_index:
-            raise ValidationError(
-                {
-                    "index": f"must be between 0 and {max_image_index} (the post contain {max_image_index + 1} images)"
-                }
+        for image_key in post.image_keys:
+            await MinioService.delete(
+                bucket=Buckets.posts,
+                key=f"{post.id}/{image_key}",
             )
-        image_ext = post.image_exts[image_index]
-        image_path = await FileService.get_one_post_image_path(
-            post_id=post_id,
-            image_index=image_index,
-            image_ext=image_ext,
+        await self._sio.emit_post_deleted(post_id=post_id)
+        return json_response(
+            data=deleted_post.to_json(detect_rels_for_user_id=request.user_id)
         )
-        return FileResponse(image_path)
 
     @authenticate()
     async def like(self, request: Request):
@@ -219,12 +208,13 @@ class PostsController:
             session=request.db_session,
             target_post_id=post_id,
             user_id=request.user_id,
+            logger=self._logger,
         )
         await self._sio.emit_post_likes_count_changed(
             post_id=post_id, new_likes_count=len(liked_post.liked_by)
         )
         return json_response(
-            data=liked_post.to_json(detect_is_liked_user_id=request.user_id)
+            data=liked_post.to_json(detect_rels_for_user_id=request.user_id)
         )
 
     @authenticate()
@@ -242,5 +232,5 @@ class PostsController:
             post_id=post_id, new_likes_count=len(updated_post.liked_by)
         )
         return json_response(
-            data=updated_post.to_json(detect_is_liked_user_id=request.user_id)
+            data=updated_post.to_json(detect_rels_for_user_id=request.user_id)
         )

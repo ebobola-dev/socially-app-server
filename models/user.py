@@ -20,7 +20,6 @@ from models.base import (
     BaseModel,
     allowed_to_update_fields,
     protected_from_json_fields,
-    relationship_fields,
     safe_fields,
     short_fields,
 )
@@ -35,9 +34,8 @@ if TYPE_CHECKING:
 
 @safe_fields("email_address")
 @protected_from_json_fields("hashed_password", "current_sid")
-@relationship_fields("following", "followers")
 @short_fields(
-    "id", "username", "fullname", "avatar_id", "avatar_type", "is_online", "deleted_at"
+    "id", "username", "fullname", "avatar_key", "avatar_type", "is_online", "deleted_at"
 )
 @allowed_to_update_fields(
     "username",
@@ -52,7 +50,7 @@ if TYPE_CHECKING:
     "is_online",
     "current_sid",
     "last_seen",
-    "avatar_id",
+    "avatar_key",
 )
 class User(BaseModel):
     __tablename__ = "users"
@@ -77,7 +75,7 @@ class User(BaseModel):
     avatar_type: Mapped[AvatarType | None] = mapped_column(
         SqlAlchemyEnum(AvatarType), nullable=True
     )
-    avatar_id: Mapped[str | None] = mapped_column(CHAR(36), nullable=True)
+    avatar_key: Mapped[str | None] = mapped_column(String(41), nullable=True)
     is_registration_completed: Mapped[BOOLEAN] = mapped_column(
         BOOLEAN(), nullable=False, default=False
     )
@@ -136,3 +134,22 @@ class User(BaseModel):
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
+
+    def to_json(
+        self, safe=False, short=False, detect_rels_for_user_id: str | None = None
+    ):
+        json_view = super().to_json(safe, short)
+        if detect_rels_for_user_id:
+            json_view['its_me'] = self.id == detect_rels_for_user_id
+
+            following_ids = map(lambda u: u.id, self.following)
+            followers_ids = map(lambda u: u.id, self.followers)
+            json_view['is_following'] = detect_rels_for_user_id in followers_ids
+            json_view['is_followed_by'] = detect_rels_for_user_id in following_ids
+
+        if not short:
+            json_view['following_count'] = len(self.following)
+            json_view['followers_count'] = len(self.followers)
+            posts = tuple(filter(lambda p: not p.is_deleted, self.posts))
+            json_view['posts_count'] = len(posts)
+        return json_view

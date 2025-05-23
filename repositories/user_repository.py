@@ -21,6 +21,7 @@ from models.exceptions.api_exceptions import (
 )
 from models.gender import Gender
 from models.pagination import Pagination
+from models.post import Post
 from models.role import Role
 from models.user import User
 from models.user_subscriptions import user_subscriptions
@@ -29,12 +30,19 @@ from models.user_subscriptions import user_subscriptions
 class UserRepository:
     @staticmethod
     async def get_by_id(
-        session: AsyncSession, user_id: str, include_deleted: bool = False
+        session: AsyncSession,
+        user_id: str,
+        include_deleted: bool = False,
     ) -> User | None:
-        user = await session.get(User, user_id)
-        if user and user.is_deleted and not include_deleted:
-            return None
-        return user
+        # user = await session.get(User, user_id)
+        # if user and user.is_deleted and not include_deleted:
+        #     return None
+        # return user
+        query = select(User).where(User.id == user_id)
+        if not include_deleted:
+            query = query.where(User.deleted_at.is_(None))
+        result = await session.scalars(query)
+        return result.first()
 
     @staticmethod
     async def get_by_id_with_relations(
@@ -44,14 +52,14 @@ class UserRepository:
             select(User)
             .where(User.id == user_id)
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
         )
         if not include_deleted:
             query = query.where(User.deleted_at.is_(None))
-        result = await session.scalars(query)
-        return result.first()
+        return await session.scalar(query)
 
     @staticmethod
     async def get_by_email(
@@ -61,9 +69,11 @@ class UserRepository:
             select(User)
             .where(User.email_address == email)
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
+            .execution_options(populate_existing=True)
         )
         if not include_deleted:
             query = query.where(User.deleted_at.is_(None))
@@ -78,9 +88,11 @@ class UserRepository:
             select(User)
             .where(User.username == username)
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
+            .execution_options(populate_existing=True)
         )
         if not include_deleted:
             query = query.where(User.deleted_at.is_(None))
@@ -120,8 +132,9 @@ class UserRepository:
             select(User)
             .where(User.role == Role.owner)
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
         )
         result = await session.scalars(query)
@@ -145,8 +158,9 @@ class UserRepository:
                 ),
             )
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
             .offset(pagination.offset)
             .limit(pagination.limit)
@@ -175,8 +189,9 @@ class UserRepository:
                 ),
             )
             .options(
-                selectinload(User.following),
-                selectinload(User.followers),
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
             )
             .offset(pagination.offset)
             .limit(pagination.limit)
@@ -188,7 +203,7 @@ class UserRepository:
     async def update_password(
         session: AsyncSession, user_id: str, new_password: str
     ) -> User:
-        user: User | None = await UserRepository.get_by_id(
+        user: User | None = await UserRepository.get_by_id_with_relations(
             session=session, user_id=user_id
         )
         if user is None:
@@ -209,10 +224,12 @@ class UserRepository:
     async def follow(session: AsyncSession, subscriber_id: str, target_id: str) -> User:
         if subscriber_id == target_id:
             raise CantFollowUnlollowYouselfError()
-        subscriber = await UserRepository.get_by_id(
+        subscriber = await UserRepository.get_by_id_with_relations(
             session=session, user_id=subscriber_id
         )
-        target = await UserRepository.get_by_id(session=session, user_id=target_id)
+        target = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=target_id
+        )
         if not subscriber:
             raise UserNotFoundError(subscriber_id)
         if not target:
@@ -237,10 +254,12 @@ class UserRepository:
     ) -> User:
         if subscriber_id == target_id:
             raise CantFollowUnlollowYouselfError()
-        subscriber = await UserRepository.get_by_id(
+        subscriber = await UserRepository.get_by_id_with_relations(
             session=session, user_id=subscriber_id
         )
-        target = await UserRepository.get_by_id(session=session, user_id=target_id, include_deleted=True)
+        target = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=target_id, include_deleted=True
+        )
         if not subscriber:
             raise UserNotFoundError(subscriber_id)
         if not target:
@@ -274,7 +293,9 @@ class UserRepository:
             fullname = ""
         if about_me is None:
             about_me = ""
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         if user.is_registration_completed:
@@ -304,13 +325,15 @@ class UserRepository:
         session: AsyncSession,
         user_id: str,
         new_avatar_type: AvatarType,
-        new_avatar_id: str | None = None,
+        new_avatar_key: str | None = None,
     ) -> User:
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = new_avatar_type
-        user.avatar_id = new_avatar_id
+        user.avatar_key = new_avatar_key
         try:
             await session.flush()
             await session.refresh(user)
@@ -321,11 +344,13 @@ class UserRepository:
 
     @staticmethod
     async def delete_avatar(session: AsyncSession, user_id: str) -> User:
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = None
-        user.avatar_id = None
+        user.avatar_key = None
         try:
             await session.flush()
             await session.refresh(user)
@@ -338,7 +363,9 @@ class UserRepository:
     async def toggle_online(
         session: AsyncSession, user_id: str, new_is_online_value: bool
     ) -> User:
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         if user.is_online and not new_is_online_value:
@@ -356,7 +383,9 @@ class UserRepository:
     async def set_current_sid(
         session: AsyncSession, user_id: str, new_sid: str | None
     ) -> User:
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         if not new_sid:
@@ -381,7 +410,9 @@ class UserRepository:
             raise NothingToUpdateError(
                 server_message=f"nothing to update, {update_data} -> {new_data}",
             )
-        user: User = await UserRepository.get_by_id(session=session, user_id=user_id)
+        user: User = await UserRepository.get_by_id_with_relations(
+            session=session, user_id=user_id
+        )
         if not user:
             raise UserNotFoundError(user_id)
         for field, value in new_data.items():
@@ -396,15 +427,24 @@ class UserRepository:
 
     @staticmethod
     async def get_followings(
-        session: AsyncSession, target_id: str, pagination: Pagination
+        session: AsyncSession,
+        target_id: str,
+        pagination: Pagination,
     ) -> list[User]:
-        target_user = await UserRepository.get_by_id(session=session, user_id=target_id)
+        target_user = await UserRepository.get_by_id(
+            session=session, user_id=target_id
+        )
         if not target_user:
             raise UserNotFoundError(target_id)
         query = (
             select(User)
             .join(user_subscriptions, user_subscriptions.c.following_id == User.id)
             .where(user_subscriptions.c.follower_id == target_id)
+            .options(
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
+            )
             .offset(pagination.offset)
             .limit(pagination.limit)
         )
@@ -413,7 +453,9 @@ class UserRepository:
 
     @staticmethod
     async def get_followers(
-        session: AsyncSession, target_id: str, pagination: Pagination
+        session: AsyncSession,
+        target_id: str,
+        pagination: Pagination,
     ) -> list[User]:
         target_user = await UserRepository.get_by_id(session=session, user_id=target_id)
         if not target_user:
@@ -422,6 +464,11 @@ class UserRepository:
             select(User)
             .join(user_subscriptions, user_subscriptions.c.follower_id == User.id)
             .where(user_subscriptions.c.following_id == target_id)
+            .options(
+                selectinload(User.following).load_only(User.id),
+                selectinload(User.followers).load_only(User.id),
+                selectinload(User.posts).load_only(Post.id, Post.deleted_at),
+            )
             .offset(pagination.offset)
             .limit(pagination.limit)
         )
@@ -430,7 +477,9 @@ class UserRepository:
 
     @staticmethod
     async def update_role(session: AsyncSession, target_id, new_role: Role) -> User:
-        target_user: User | None = await UserRepository.get_by_id(session=session, user_id=target_id)
+        target_user: User | None = await UserRepository.get_by_id(
+            session=session, user_id=target_id
+        )
         if not target_user:
             raise UserNotFoundError(target_id)
         if new_role == Role.owner:
@@ -453,12 +502,14 @@ class UserRepository:
 
     @staticmethod
     async def soft_delete(session: AsyncSession, target_id: str) -> User:
-        target_user: User | None = await UserRepository.get_by_id(session=session, user_id=target_id)
+        target_user: User | None = await UserRepository.get_by_id(
+            session=session, user_id=target_id
+        )
         if not target_user:
             raise UserNotFoundError(target_id)
         if target_user.role == Role.owner:
             raise BadRequestError(
-                server_message="Don't delete the owner",
+                server_message="Don't deleting the owner",
                 global_errors=["You are the owner!"],
             )
         deleted_tag = f"deleted-{target_id[:4]}{token_hex(2)}"
@@ -470,14 +521,18 @@ class UserRepository:
         target_user.gender = None
         target_user.about_me = ""
         target_user.avatar_type = None
-        target_user.avatar_id = None
+        target_user.avatar_key = None
         target_user.is_online = False
         target_user.current_sid = None
         target_user.last_seen = None
 
         target_user.deleted_at = datetime.now(timezone.utc)
 
-        await session.execute(delete(user_subscriptions).where(user_subscriptions.c.follower_id == target_id))
+        await session.execute(
+            delete(user_subscriptions).where(
+                user_subscriptions.c.follower_id == target_id
+            )
+        )
 
         await session.flush()
         await session.refresh(target_user)

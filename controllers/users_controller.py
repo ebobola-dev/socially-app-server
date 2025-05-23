@@ -4,7 +4,8 @@ from io import BytesIO
 from logging import Logger
 from uuid import uuid4
 
-from aiohttp.web import FileResponse, Request, json_response
+from aiohttp.web import Request, json_response
+from aiohttp.web_exceptions import HTTPNotImplemented
 
 from config.length_requirements import LengthRequirements
 from config.server_config import ServerConfig
@@ -23,7 +24,6 @@ from models.exceptions.api_exceptions import (
     InvalidImageError,
     NothingToUpdateError,
     UnauthorizedError,
-    UserDoesNotHaveExternalAvatarImageError,
     UsernameIsAlreadyTakenError,
     UserNotFoundError,
     ValidationError,
@@ -32,7 +32,7 @@ from models.gender import Gender
 from models.pagination import Pagination
 from models.role import Role
 from repositories.user_repository import UserRepository
-from services.file_service import FileService
+from services.minio_service import Buckets, MinioService
 from services.tokens_service import TokensService
 from utils.image_utils import ImageUtils, PillowValidatationResult
 from utils.my_validator.my_validator import ValidateField, validate_request_body
@@ -63,7 +63,11 @@ class UsersController:
         )
         if user is None:
             raise UserNotFoundError(user_id)
-        return json_response(data=user.to_json(safe=user_id == request.user_id))
+        return json_response(
+            data=user.to_json(
+                safe=user_id == request.user_id, detect_rels_for_user_id=request.user_id
+            )
+        )
 
     @authenticate()
     async def search(self, request: Request):
@@ -83,7 +87,14 @@ class UsersController:
             ignore_id=request.user_id,
         )
 
-        result_json = tuple(map(lambda user: user.to_json(short=True), result))
+        result_json = tuple(
+            map(
+                lambda user: user.to_json(
+                    short=True, detect_rels_for_user_id=request.user_id
+                ),
+                result,
+            )
+        )
 
         return json_response(
             data={
@@ -158,7 +169,13 @@ class UsersController:
             request.db_session, user.id, new_data
         )
 
-        return json_response({"updated_user": updated_user.to_json(safe=True)})
+        return json_response(
+            {
+                "updated_user": updated_user.to_json(
+                    safe=True, detect_rels_for_user_id=request.user_id
+                )
+            }
+        )
 
     @authenticate()
     @content_type_is_json()
@@ -256,32 +273,50 @@ class UsersController:
                 and is_valid_by_filetype
             ):
                 raise InvalidImageError(field_name="avatar", filename=filename)
-            avatar_id = uuid4()
-            if user.avatar_id is not None:
-                await FileService.delete_avatar(user.id)
-            await FileService.save_avatar(
-                user_id=user.id,
-                avatar_bytes=avatar_file_buffer,
-                avatar_filename_ext=file_ext[1:],
-            )
+            new_avatar_key = f"{uuid4()}{file_ext}"
+            if user.avatar_key is not None:
+                await MinioService.delete(
+                    bucket=Buckets.avatars,
+                    key=user.avatar_key,
+                )
             updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
                 user_id=user.id,
                 new_avatar_type=avatar_type,
-                new_avatar_id=avatar_id,
+                new_avatar_key=new_avatar_key,
+            )
+            await MinioService.save(
+                bucket=Buckets.avatars,
+                key=new_avatar_key,
+                bytes=avatar_file_buffer,
             )
             self._logger.debug(f"(update avatar) @{user.username} uploaded new avatar")
-            return json_response(data={"updated_user": updated_user.to_json(safe=True)})
+            return json_response(
+                data={
+                    "updated_user": updated_user.to_json(
+                        safe=True, detect_rels_for_user_id=request.user_id
+                    )
+                }
+            )
         else:
             if user.avatar_type is AvatarType.external:
-                await FileService.delete_avatar(user.id)
+                await MinioService.delete(
+                    bucket=Buckets.avatars,
+                    key=user.avatar_key,
+                )
             updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
                 user_id=user.id,
                 new_avatar_type=avatar_type,
             )
             self._logger.debug(f"@{user.username} changed avatar to {avatar_type}")
-            return json_response(data={"updated_user": updated_user.to_json(safe=True)})
+            return json_response(
+                data={
+                    "updated_user": updated_user.to_json(
+                        safe=True, detect_rels_for_user_id=request.user_id
+                    )
+                }
+            )
 
     @authenticate()
     async def delete_avatar(self, request: Request):
@@ -292,26 +327,18 @@ class UsersController:
         if not saved_user:
             raise UserNotFoundError(user_id)
         updated_user = await UserRepository.delete_avatar(request.db_session, user_id)
-        await FileService.delete_avatar(user_id)
-        self._logger.debug(f"@{saved_user.username} deleted avatar")
-        return json_response(data={"updated_user": updated_user.to_json(safe=True)})
-
-    async def get_avatar_image(self, request: Request):
-        user_id = request.match_info.get("user_id")
-        target_user = await UserRepository.get_by_id_with_relations(
-            request.db_session, user_id
+        await MinioService.delete(
+            bucket=Buckets.avatars,
+            key=saved_user.avatar_key,
         )
-        if not target_user:
-            raise UserNotFoundError(user_id)
-        if not target_user.avatar_id or target_user.avatar_type != AvatarType.external:
-            raise UserDoesNotHaveExternalAvatarImageError(target_user.username)
-        avatar_file_path = await FileService.get_avatar_filepath(user_id)
-        if avatar_file_path is None:
-            self._logger.warning(
-                f"Unable to find avatar file path for @{target_user.username}, but its exists in database"
-            )
-            raise UserDoesNotHaveExternalAvatarImageError(target_user.username)
-        return FileResponse(avatar_file_path)
+        self._logger.debug(f"@{saved_user.username} deleted avatar")
+        return json_response(
+            data={
+                "updated_user": updated_user.to_json(
+                    safe=True, detect_rels_for_user_id=request.user_id
+                )
+            }
+        )
 
     @authenticate()
     async def follow(self, request: Request):
@@ -336,7 +363,13 @@ class UsersController:
                 follower_id=user_id,
                 follower_username=updated_user.username,
             )
-        return json_response({"updated_user": updated_user.to_json(safe=True)})
+        return json_response(
+            {
+                "updated_user": updated_user.to_json(
+                    safe=True, detect_rels_for_user_id=request.user_id
+                )
+            }
+        )
 
     @authenticate()
     async def unfollow(self, request: Request):
@@ -351,7 +384,13 @@ class UsersController:
         updated_user = await UserRepository.unfollow(
             request.db_session, user_id, target_id
         )
-        return json_response({"updated_user": updated_user.to_json(safe=True)})
+        return json_response(
+            {
+                "updated_user": updated_user.to_json(
+                    safe=True, detect_rels_for_user_id=request.user_id
+                )
+            }
+        )
 
     @authenticate()
     async def get_followings(self, request: Request):
@@ -374,7 +413,12 @@ class UsersController:
                     "limit": pagination.limit,
                 },
                 "followings": list(
-                    map(lambda u: u.to_json(short=True), target_followings)
+                    map(
+                        lambda u: u.to_json(
+                            short=True, detect_rels_for_user_id=request.user_id
+                        ),
+                        target_followings,
+                    )
                 ),
             }
         )
@@ -400,7 +444,12 @@ class UsersController:
                     "limit": pagination.limit,
                 },
                 "followers": list(
-                    map(lambda u: u.to_json(short=True), target_followers)
+                    map(
+                        lambda u: u.to_json(
+                            short=True, detect_rels_for_user_id=request.user_id
+                        ),
+                        target_followers,
+                    )
                 ),
             }
         )
@@ -450,11 +499,22 @@ class UsersController:
         if user is None:
             raise UserNotFoundError(request.user_id)
         user_sid = user.current_sid
-        await UserRepository.soft_delete(session=request.db_session, target_id=user.id)
+        try:
+            await UserRepository.soft_delete(
+                session=request.db_session, target_id=user.id
+            )
+            await TokensService.delete_all_by_user_id(
+                session=request.db_session, user_id=user.id
+            )
+            await request.db_session.commit()
+        except Exception as _:
+            await request.db_session.rollback()
+            raise
         await self._sio.on_user_deleted(user_sid)
-        await TokensService.delete_all_by_user_id(
-            session=request.db_session, user_id=user.id
-        )
-        await request.db_session.commit()
         self._logger.warning(f"User (@{user.username}) has been deleted (by himself)\n")
         raise UnauthorizedError()
+
+    @authenticate()
+    @owner_role()
+    async def hard_clear_removed_users(self, request: Request):
+        raise HTTPNotImplemented()

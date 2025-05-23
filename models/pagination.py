@@ -1,6 +1,6 @@
 from aiohttp.web import Request
 
-from models.exceptions.api_exceptions import ValidationError
+from models.exceptions.api_exceptions import BadRequestError
 
 
 class Pagination:
@@ -14,9 +14,9 @@ class Pagination:
             offset = int(request.query.get("offset", 0))
             limit = int(request.query.get("limit", 10))
         except Exception as _:
-            raise ValidationError("Invalid pagination data")
-        if offset < 0 or limit < 1:
-            raise ValidationError("Invalid pagination data")
+            raise BadRequestError("Invalid pagination data")
+        if offset < 0 or limit < 0:
+            raise BadRequestError("Invalid pagination data")
         return Pagination(offset=offset, limit=limit)
 
     @staticmethod

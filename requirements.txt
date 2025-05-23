@@ -31,3 +31,4 @@ uvloop==0.21.0
 aiosmtplib==4.0.0
 aiofiles==24.1.0
 packaging==24.2
+minio==7.2.15

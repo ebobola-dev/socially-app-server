@@ -33,3 +33,9 @@ class UnableToInitalizeDatabaseError(InitializeError):
 class DatabaseNotInitializedError(InitializeError):
     def __init__(self):
         super().__init__("Database has not beed initialized, but is being user")
+
+class ServiceNotInitalizedButUsingError(InitializeError):
+    def __init__(self, service_name: str):
+        super().__init__(
+            f"Service [{service_name}] has not been initialized, but is being used"
+        )

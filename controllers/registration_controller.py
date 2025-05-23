@@ -188,4 +188,4 @@ class RegistrationController:
             password=password,
         )
         self._logger.debug(f"{user.email_address} completed the registration")
-        return json_response(data=updated_user.to_json(safe=True))
+        return json_response(data=updated_user.to_json(safe=True, detect_rels_for_user_id=updated_user.id))

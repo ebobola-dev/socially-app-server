@@ -39,3 +39,7 @@ class ApkUpdate(BaseModel):
         if replace_descriptions:
             result["descriptions"] = replace_descriptions
         return result
+
+    @property
+    def file_key(self) -> str:
+        return f'socially_app-v{self.version}.apk'

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from models.comment import Comment
 from models.exceptions.api_exceptions import (
@@ -21,12 +21,19 @@ from repositories.user_repository import UserRepository
 class PostRepository:
     @staticmethod
     async def get_by_id(
-        session: AsyncSession, post_id: str, include_deleted: bool = False
+        session: AsyncSession,
+        post_id: str,
+        include_deleted: bool = False,
     ) -> Post | None:
-        post = await session.get(Post, post_id)
-        if post and post.is_deleted and not include_deleted:
-            return None
-        return post
+        # post = await session.get(Post, post_id)
+        # if post and post.is_deleted and not include_deleted:
+        #     return None
+        # return post
+        query = select(Post).where(Post.id == post_id)
+        if not include_deleted:
+            query = query.where(Post.deleted_at.is_(None))
+        result = await session.scalars(query)
+        return result.first()
 
     @staticmethod
     async def get_by_id_with_relations(
@@ -36,23 +43,28 @@ class PostRepository:
             select(Post)
             .where(Post.id == post_id)
             .options(
-                selectinload(Post.author).load_only(
-                    User.id,
-                    User.username,
-                    User.fullname,
-                    User.avatar_type,
-                    User.avatar_id,
-                    User.deleted_at,
-                    User.is_online,
+                selectinload(Post.author).options(
+                    load_only(
+                        User.id,
+                        User.username,
+                        User.fullname,
+                        User.avatar_type,
+                        User.avatar_key,
+                        User.deleted_at,
+                        User.is_online,
+                    ),
+                    selectinload(User.followers).load_only(User.id),
+                    selectinload(User.following).load_only(User.id),
                 ),
                 selectinload(Post.comments).load_only(Comment.id),
                 selectinload(Post.liked_by).load_only(User.id),
             )
+            .execution_options(populate_existing=True)
         )
         if not include_deleted:
             query = query.where(Post.deleted_at.is_(None))
-        result = await session.scalars(query)
-        return result.first()
+        post = await session.scalar(query)
+        return post
 
     @staticmethod
     async def get_all(
@@ -64,18 +76,23 @@ class PostRepository:
         query = (
             select(Post)
             .options(
-                selectinload(Post.author).load_only(
-                    User.id,
-                    User.username,
-                    User.fullname,
-                    User.avatar_type,
-                    User.avatar_id,
-                    User.deleted_at,
-                    User.is_online,
+                selectinload(Post.author).options(
+                    load_only(
+                        User.id,
+                        User.username,
+                        User.fullname,
+                        User.avatar_type,
+                        User.avatar_key,
+                        User.deleted_at,
+                        User.is_online,
+                    ),
+                    selectinload(User.followers).load_only(User.id),
+                    selectinload(User.following).load_only(User.id),
                 ),
                 selectinload(Post.comments).load_only(Comment.id),
                 selectinload(Post.liked_by).load_only(User.id),
             )
+            .execution_options(populate_existing=True)
             .offset(pagination.offset)
             .limit(pagination.limit)
             .order_by(Post.created_at.desc())
@@ -100,7 +117,7 @@ class PostRepository:
 
     @staticmethod
     async def soft_delete(session: AsyncSession, target_post_id: str) -> Post:
-        target_post = await PostRepository.get_by_id(
+        target_post = await PostRepository.get_by_id_with_relations(
             session=session, post_id=target_post_id
         )
         if not target_post:
@@ -109,15 +126,14 @@ class PostRepository:
         target_post.image_exts = []
         target_post.deleted_at = datetime.now(timezone.utc)
         await session.flush()
-        await session.refresh(target_post)
         return target_post
 
     @staticmethod
-    async def like(session: AsyncSession, target_post_id: str, user_id: str):
+    async def like(session: AsyncSession, target_post_id: str, user_id: str, logger):
         target_post = await PostRepository.get_by_id_with_relations(
             session=session, post_id=target_post_id
         )
-        user = await UserRepository.get_by_id(
+        user = await UserRepository.get_by_id_with_relations(
             session=session, user_id=user_id, include_deleted=True
         )
         if not target_post:
@@ -129,7 +145,6 @@ class PostRepository:
         target_post.liked_by.append(user)
         try:
             await session.flush()
-            await session.refresh(user)
             return target_post
         except Exception as error:
             await session.rollback()
@@ -140,7 +155,7 @@ class PostRepository:
         target_post = await PostRepository.get_by_id_with_relations(
             session=session, post_id=target_post_id
         )
-        user = await UserRepository.get_by_id(
+        user = await UserRepository.get_by_id_with_relations(
             session=session, user_id=user_id, include_deleted=True
         )
         if not target_post:
@@ -152,7 +167,6 @@ class PostRepository:
         target_post.liked_by.remove(user)
         try:
             await session.flush()
-            await session.refresh(user)
             return target_post
         except Exception as error:
             await session.rollback()

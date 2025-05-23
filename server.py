@@ -8,11 +8,13 @@ from config.database_config import DatabaseConfig
 from config.email_config import EmailConfig
 from config.jwt_config import JwtConfig
 from config.logger_config import MyLoggerConfig
+from config.minio_config import MinioConfig
 from config.paths import Paths
 from config.server_config import ServerConfig
 from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
 from controllers.comments_controller import CommentsController
+from controllers.media_controller import MediaController
 from controllers.middlewares import Middlewares
 from controllers.posts_controller import PostsController
 from controllers.registration_controller import RegistrationController
@@ -24,6 +26,7 @@ from models.comment import Comment  # noqa: F401
 from models.post import Post  # noqa: F401
 from models.post_likes import post_likes  # noqa: F401
 from models.user import User  # noqa: F401
+from services.minio_service import MinioService
 from services.test_users import TestUsers
 
 
@@ -33,6 +36,8 @@ async def initialize():
     JwtConfig.initialize()
     EmailConfig.initialize()
     MyLoggerConfig.initialize()
+    MinioConfig.initialize()
+    await MinioService.initialize()
     await Database.initialize()
 
 
@@ -103,6 +108,7 @@ async def main():
         logger=MyLogger.get_logger("Commetns"),
         main_sio_namespace=main_sio_namespace,
     )
+    media_controller = MediaController(logger=MyLogger.get_logger("Media"))
 
     app.add_routes(
         [
@@ -114,6 +120,7 @@ async def main():
                 Paths.Registration.COMPLETE_REGISTRATION,
                 registration_controller.complete_registration,
             ),
+            #
             web.post(Paths.Auth.LOGIN, auth_controller.login),
             web.post(
                 Paths.Auth.ResetPassword.SEND_OTP,
@@ -125,6 +132,7 @@ async def main():
             ),
             web.post(Paths.Auth.REFRESH, auth_controller.refresh),
             web.put(Paths.Auth.LOGOUT, auth_controller.logout),
+            #
             web.get(Paths.Users.CHECK_USERNAME, users_controller.check_username),
             web.get(Paths.Users.GET_BY_ID, users_controller.get_by_id),
             web.get(Paths.Users.SEARCH, users_controller.search),
@@ -132,35 +140,40 @@ async def main():
             web.put(Paths.Users.UPDATE_PASSWORD, users_controller.update_password),
             web.put(Paths.Users.UPDATE_AVATAR, users_controller.update_avatar),
             web.delete(Paths.Users.DELETE_AVATAR, users_controller.delete_avatar),
-            web.get(Paths.Users.GET_AVATAR_IMAGE, users_controller.get_avatar_image),
             web.put(Paths.Users.FOLLOW, users_controller.follow),
             web.delete(Paths.Users.UNFOLLOW, users_controller.unfollow),
             web.get(Paths.Users.GET_FOLLOWINGS, users_controller.get_followings),
             web.get(Paths.Users.GET_FOLLOWERS, users_controller.get_followers),
             web.put(Paths.Users.UPDATE_ROLE, users_controller.update_role),
             web.delete(Paths.Users.DELETE, users_controller.soft_delete),
+            #
             web.get(
                 Paths.TestUsers.ADMIN_ROLE_TEST, test_users_controller.test_admin_role
             ),
             web.get(
                 Paths.TestUsers.OWNER_ROLE_TEST, test_users_controller.test_owner_role
             ),
+            #
             web.post(Paths.ApkUpdates.ADD, apk_updates_controller.add),
             web.get(Paths.ApkUpdates.GET_ONE, apk_updates_controller.get_one),
             web.get(Paths.ApkUpdates.GET_MANY, apk_updates_controller.get_many),
-            web.get(Paths.ApkUpdates.DOWNLOAD, apk_updates_controller.download),
             web.delete(Paths.ApkUpdates.DELETE, apk_updates_controller.delete),
+            #
             web.get(Paths.Posts.GET_ALL, posts_controller.get_all),
             web.get(Paths.Posts.GET_ONE, posts_controller.get_one),
             web.delete(Paths.Posts.DELETE, posts_controller.delete),
             web.post(Paths.Posts.CREATE, posts_controller.create),
-            web.get(Paths.Posts.GET_IMAGE, posts_controller.get_post_image),
             web.post(Paths.Posts.LIKE, posts_controller.like),
             web.delete(Paths.Posts.UNLIKE, posts_controller.unlike),
-
             web.get(Paths.Posts.Comments.GET_ALL, comments_controller.get_all),
             web.post(Paths.Posts.Comments.CREATE, comments_controller.add),
             web.delete(Paths.Posts.Comments.DELETE, comments_controller.delete),
+            #
+            # web.get(Paths.Media.AVATARS, media_controller.get_avatar_image),
+            # web.get(Paths.Media.POSTS, media_controller.get_post_image),
+            # web.get(Paths.Media.MESSAGES, media_controller.get_message_image),
+            web.get(Paths.Media.UNIVERSAL, media_controller.get),
+            web.get(Paths.Media.WITH_FOLDER, media_controller.get_with_folder),
         ]
     )
 

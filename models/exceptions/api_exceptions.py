@@ -1,6 +1,7 @@
 from packaging.version import Version
 
 from config.server_config import ServerConfig
+from models.exceptions.api_conflict_type import ApiConflictType
 from models.role import Role
 from utils.sizes import SizeUtils
 
@@ -158,19 +159,33 @@ class UnableToDecodeJsonBodyError(BadRequestError):
         )
 
 
-class AlreadyFollowingError(BadRequestError):
-    def __init__(self, sub_username, target_username):
+class ConflictError(ApiError):
+    def __init__(
+        self, conflict_type: ApiConflictType, server_message: str = "CONFLICT"
+    ):
         super().__init__(
-            server_message=f"@{sub_username} already following @{target_username}",
-            global_errors=["You are already following the target user"],
+            response_status_code=409,
+            server_message=server_message,
+            field_specific_erros={
+                "conflict_type": conflict_type.name,
+            },
+            global_errors=[],
         )
 
 
-class NotFollowingAnywayError(BadRequestError):
+class AlreadyFollowingError(ConflictError):
     def __init__(self, sub_username, target_username):
         super().__init__(
+            conflict_type=ApiConflictType.ALREADY_FOLLOWING,
+            server_message=f"@{sub_username} already following @{target_username}",
+        )
+
+
+class NotFollowingAnywayError(ConflictError):
+    def __init__(self, sub_username, target_username):
+        super().__init__(
+            conflict_type=ApiConflictType.NOT_FOLLWING,
             server_message=f"@{sub_username} not following @{target_username} anyway",
-            global_errors=["You are not following the target user anyway"],
         )
 
 
@@ -405,19 +420,19 @@ class InvalidImageError(ValidationError):
         super().__init__(fc_error)
 
 
-class AlreadyLikedError(BadRequestError):
+class AlreadyLikedError(ConflictError):
     def __init__(self, user_id: str, post_id: str):
         super().__init__(
+            conflict_type=ApiConflictType.ALREADY_LIKED,
             server_message=f"User({user_id}) already liked post({post_id})",
-            global_errors=["You are already liked the target post"],
         )
 
 
-class NotLikedAnywayError(BadRequestError):
+class NotLikedAnywayError(ConflictError):
     def __init__(self, user_id: str, post_id: str):
         super().__init__(
+            conflict_type=ApiConflictType.NOT_LIKED,
             server_message=f"User({user_id}) not liked post({post_id}) anyway",
-            global_errors=["You are not liked the target post anyway"],
         )
 
 
@@ -432,3 +447,22 @@ class CommentNotFoundError(BadRequestError):
 class ForbiddenToDeleteCommentError(ForbiddenError):
     def __init__(self, one_global_error="You can't delete someone else's comment"):
         super().__init__("Forbidden to delete comment", [one_global_error])
+
+
+class MinioNotFoundError(ApiError):
+    def __init__(self, key: str = "was not specified"):
+        super().__init__(
+            response_status_code=404,
+            server_message=f"Minio could't found file by key: {key}",
+            global_errors=["File not found"],
+        )
+
+
+class MinioError(ApiError):
+    def __init__(
+        self,
+        error: str | object = "was not specified",
+    ):
+        super().__init__(
+            server_message=f"Minio error: {error}",
+        )

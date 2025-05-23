@@ -29,7 +29,6 @@ class Paths:
         UPDATE_PASSWORD = f"{_base_path}/update_password"
         UPDATE_AVATAR = f"{_base_path}/update_avatar"
         DELETE_AVATAR = f"{_base_path}/delete_avatar"
-        GET_AVATAR_IMAGE = f"{_base_path}/avatars/{{user_id}}"
         FOLLOW = f"{_base_path}/follow"
         UNFOLLOW = f"{_base_path}/unfollow"
         GET_FOLLOWINGS = f"{_base_path}/followings"
@@ -47,7 +46,6 @@ class Paths:
         ADD = f"{_base_path}/add"
         GET_ONE = f"{_base_path}/{{update_id}}"
         DELETE = f"{_base_path}/delete"
-        DOWNLOAD = f"{_base_path}/download"
 
     class Posts:
         _base_path = f"{_base_api_path}/posts"
@@ -55,7 +53,6 @@ class Paths:
         CREATE = _base_path
         DELETE = _base_path
         GET_ONE = f"{_base_path}/{{post_id}}"
-        GET_IMAGE = f"{_base_path}/{{post_id}}/images"
         LIKE = f"{_base_path}/likes"
         UNLIKE = f"{_base_path}/likes"
 
@@ -64,3 +61,11 @@ class Paths:
             GET_ALL = _base_path
             CREATE = _base_path
             DELETE = f"{_base_api_path}/posts/comments"
+
+    class Media:
+        _base_path = f'{_base_api_path}/media'
+        UNIVERSAL = f'{_base_path}/{{category}}/{{key}}'
+        WITH_FOLDER = f'{_base_path}/{{category}}/{{folder}}/{{key}}'
+        AVATARS = f'{_base_path}/avatars/{{avatar_key}}'
+        POSTS = f'{_base_path}/posts/{{post_id}}'
+        MESSAGES = f'{_base_path}/messages/{{message_id}}'

@@ -2,7 +2,7 @@ services:
   server:
     build: .
     env_file: .env
-    container_name: 'server'
+    container_name: "socially-server"
     environment:
       RUN_IN_DOCKER: true
       TZ: UTC
@@ -10,11 +10,6 @@ services:
       MYSQL_USER: ${DOCKER_MYSQL_USER}
       MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD}
       LOGGING_LEVEL: INFO
-    volumes:
-      - /home/ebobola/data/socially_app/external_avatars:/files/external_avatars
-      - /home/ebobola/data/socially_app/apks:/files/apks
-      - /home/ebobola/data/socially_app/posts:/files/posts
-      - /home/ebobola/data/socially_app/messages:/files/messages
     expose:
       - "${SERVER_PORT}"
     depends_on:
@@ -24,7 +19,7 @@ services:
 
   nginx:
     image: nginx:1.27
-    container_name: 'nginx'
+    container_name: "socially-nginx"
     build:
       context: ./nginx
     env_file: .env
@@ -34,11 +29,12 @@ services:
       - "${NGINX_EXTERNAL_PORT}:80"
     depends_on:
       - server
+      - minio
     restart: unless-stopped
 
   db:
     image: mysql:8.0
-    container_name: 'database'
+    container_name: "socially-database"
     environment:
       TZ: UTC
       MYSQL_DATABASE: ${MYSQL_NAME}
@@ -54,5 +50,17 @@ services:
       retries: 5
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:latest
+    container_name: socially-minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
 volumes:
   db_data:
+  minio_data:

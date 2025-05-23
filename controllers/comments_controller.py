@@ -44,7 +44,9 @@ class CommentsController:
 
         json_comments = tuple(
             map(
-                lambda comment: comment.to_json(include_reply=True),
+                lambda comment: comment.to_json(
+                    include_reply=True, detect_rels_for_user_id=request.user_id
+                ),
                 comments,
             )
         )
@@ -160,5 +162,8 @@ class CommentsController:
             post_id=post_id, new_comments_count=len(target_post.comments)
         )
         return json_response(
-            data=new_comment.to_json(include_reply=reply_to_comment_id is not None)
+            data=new_comment.to_json(
+                include_reply=reply_to_comment_id is not None,
+                detect_rels_for_user_id=request.user_id,
+            )
         )

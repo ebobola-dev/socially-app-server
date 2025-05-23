@@ -3,7 +3,7 @@ from io import BytesIO
 from logging import Logger
 from re import fullmatch
 
-from aiohttp.web import FileResponse, Request, Response, json_response
+from aiohttp.web import Request, Response, json_response
 from packaging.version import Version
 
 from config.re_patterns import RePatterns
@@ -20,7 +20,7 @@ from models.exceptions.api_exceptions import (
     ValidationError,
 )
 from repositories.apk_update_repository import ApkUpdateRepository
-from services.file_service import FileService
+from services.minio_service import Buckets, MinioService
 from utils.file_utils import FileUtils
 from utils.my_validator.my_validator import ValidateField
 from utils.sizes import SizeUtils
@@ -158,9 +158,10 @@ class ApkUpdatesController:
             session=request.db_session,
             apk_update=new_apk_update,
         )
-        await FileService.save_apk_update_file(
-            apk_file_bytes=apk_file_buffer,
-            filename=apk_filename,
+        await MinioService.save(
+            bucket=Buckets.apks,
+            key=new_apk_update.file_key,
+            bytes=apk_file_buffer,
         )
         # TODO emit users by socket io
         return json_response(data=new_apk_update.to_json())
@@ -171,7 +172,10 @@ class ApkUpdatesController:
         version = request.query.get("version")
         ValidateField.version()(version)
         version = Version(version)
-        await FileService.delete_apk_update_file(version=version)
+        await MinioService.delete(
+            bucket=Buckets.apks,
+            key=f'socially_app-v{version}.apk',
+        )
         deleted_count = await ApkUpdateRepository.delete_by_version(
             session=request.db_session, version=version
         )
@@ -180,17 +184,3 @@ class ApkUpdatesController:
                 "deleted_count": deleted_count,
             }
         )
-
-    async def download(self, request: Request) -> Response:
-        version = request.query.get("version")
-        ValidateField.version()(version)
-        version = Version(version)
-        if not (
-            await ApkUpdateRepository.get_by_version(
-                session=request.db_session,
-                version=version,
-            )
-        ):
-            raise CouldNotFoundApkUpdateWithVersionError(version)
-        apk_filepath = await FileService.get_apk_filepath(version)
-        return FileResponse(apk_filepath)
