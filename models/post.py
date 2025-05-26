@@ -18,7 +18,8 @@ if TYPE_CHECKING:
     from models.comment import Comment
     from models.user import User
 
-@short_fields('id', 'created_at', 'deleted_at')
+
+@short_fields("id", "created_at", "deleted_at")
 class Post(BaseModel):
     __tablename__ = "posts"
 
@@ -87,7 +88,7 @@ class Post(BaseModel):
     def to_json(self, detect_rels_for_user_id: str | None = None, short: bool = False):
         json_view = super().to_json(safe=False, short=short)
         if short:
-            json_view['first_image_key'] = self.image_keys[0]
+            json_view["first_image_key"] = self.image_keys[0]
             return json_view
         json_view["author"] = self.author.to_json(
             short=True, detect_rels_for_user_id=detect_rels_for_user_id

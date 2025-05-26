@@ -27,6 +27,7 @@ from models.post import Post  # noqa: F401
 from models.post_likes import post_likes  # noqa: F401
 from models.user import User  # noqa: F401
 from services.minio_service import MinioService
+from services.session_store import SessionStore
 from services.test_users import TestUsers
 
 
@@ -37,6 +38,7 @@ async def initialize():
     EmailConfig.initialize()
     MyLoggerConfig.initialize()
     MinioConfig.initialize()
+    await SessionStore.initialize()
     await MinioService.initialize()
     await Database.initialize()
 

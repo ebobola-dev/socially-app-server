@@ -11,8 +11,9 @@ from models.comment import Comment
 from models.sio.authorize_error import AuthorizeError
 from models.sio.sio_ack import SioAck
 from models.sio.sio_rooms import SioRooms
-from models.sio.sio_session import AuthorizedSioSession, SioSession
+from models.sio.sio_session import SioSession
 from repositories.user_repository import UserRepository
+from services.session_store import SessionStore
 from services.tokens_service import TokensService
 from utils.serialize_util import serialize_value
 
@@ -20,13 +21,13 @@ from utils.serialize_util import serialize_value
 def check_authorization(handler):
     @wraps(handler)
     async def wrapper(self, sid, *args, **kwargs):
-        session = await self.get_session(sid)
-        if not isinstance(session, AuthorizedSioSession):
+        sio_session = await SessionStore.get_session_by_sid(sid)
+        if not sio_session:
             self._logger.warning(
                 f"[{sid}] Tried to access event without authorization ({handler.__name__})\n"
             )
             return SioAck.failed("You are not authorized").to_json()
-        return await handler(self, sid, *args, **kwargs, session=session)
+        return await handler(self, sid, *args, **kwargs, sio_session=sio_session)
 
     return wrapper
 
@@ -39,8 +40,8 @@ class SioController(AsyncNamespace):
 
     async def _wait_authorization(self, sid):
         await asyncio.sleep(60)
-        session = await self.get_session(sid)
-        if not isinstance(session, AuthorizedSioSession):
+        sio_session = await SessionStore.get_session_by_sid(sid)
+        if not sio_session:
             self._logger.info(
                 f"[{sid}] Didn't authorize for a minute, disconnecting...\n"
             )
@@ -54,7 +55,7 @@ class SioController(AsyncNamespace):
             self._wait_authorization_tasks.pop(sid, None)
             self._logger.debug(f"[{sid}] Wait authorization task canceled\n")
 
-    async def _authorize(self, db_session, sid, data) -> AuthorizedSioSession:
+    async def _authorize(self, db_session, sid, data) -> SioSession:
         try:
             device_id = data.get("device_id")
             access_token = data.get("access_token")
@@ -92,7 +93,7 @@ class SioController(AsyncNamespace):
                     internal_message=f"Access token is valid and user found, but unable to find refresh token in database with device_id({device_id}) and user_id({user_id})",
                     ack_message="Bad token",
                 )
-            return AuthorizedSioSession(
+            return SioSession(
                 sid=sid,
                 user_id=user_id,
                 user_role=user_role,
@@ -115,7 +116,6 @@ class SioController(AsyncNamespace):
 
     # * ------------------------ Event Listeners ------------------------
     async def on_connect(self, sid, environ, auth=None):
-        await self.save_session(sid, SioSession(sid))
         self._wait_authorization_tasks[sid] = asyncio.create_task(
             self._wait_authorization(sid)
         )
@@ -125,23 +125,24 @@ class SioController(AsyncNamespace):
         async with Database.session_maker() as db_session:
             self._logger.info(f"[{sid}] Disconnected ({reason})\n")
             self._cancel_wait_authorization(sid)
-            session: SioSession = await self.get_session(sid)
+            sio_session: SioSession | None = await SessionStore.get_session_by_sid(sid)
 
             # * Set user disconnected
-            if isinstance(session, AuthorizedSioSession):
+            if sio_session:
                 try:
                     updated_user = await UserRepository.set_current_sid(
-                        db_session, session.user_id, new_sid=None
+                        db_session, sio_session.user_id, new_sid=None
                     )
                     await db_session.commit()
                     await self.emit_user_is_offline(
-                        user_id=session.user_id,
+                        user_id=sio_session.user_id,
                         last_seen=updated_user.last_seen,
                     )
+                    await SessionStore.remove_session(sid)
                 except Exception as db_error:
                     await db_session.rollback()
                     self._logger.error(
-                        f"(on_disconnect) Error on set current sid to user {session.user_id}: {db_error}"
+                        f"(on_disconnect) Error on set current sid to user {sio_session.user_id}: {db_error}"
                     )
 
     async def on_authorize(self, sid, data=None):
@@ -149,15 +150,17 @@ class SioController(AsyncNamespace):
             return SioAck.failed("Bad authorization data").to_json()
         async with Database.session_maker() as db_session:
             try:
-                authorized_session = await self._authorize(
+                sio_session = await self._authorize(
                     db_session=db_session,
                     sid=sid,
                     data=data,
                 )
-                await self.save_session(sid, authorized_session)
+
+                await SessionStore.save_session(sio_session)
+
                 await UserRepository.set_current_sid(
                     session=db_session,
-                    user_id=authorized_session.user_id,
+                    user_id=sio_session.user_id,
                     new_sid=sid,
                 )
                 await db_session.commit()
@@ -169,7 +172,7 @@ class SioController(AsyncNamespace):
                 )
                 await self.enter_room(
                     sid=sid,
-                    room=SioRooms.get_personal_room(user_id=authorized_session.user_id),
+                    room=SioRooms.get_personal_room(user_id=sio_session.user_id),
                 )
                 return SioAck.success().to_json()
             except AuthorizeError as authorized_error:
@@ -184,7 +187,7 @@ class SioController(AsyncNamespace):
 
     @check_authorization
     async def on_put_app_in_background(
-        self, sid, data=None, session: AuthorizedSioSession = None
+        self, sid, data=None, sio_session: SioSession = None
     ):
         self._logger.debug(f"[{sid}] got event (put_app_in_background)\n")
 
@@ -192,11 +195,11 @@ class SioController(AsyncNamespace):
         async with Database.session_maker() as db_session:
             try:
                 updated_user = await UserRepository.toggle_online(
-                    db_session, session.user_id, False
+                    db_session, sio_session.user_id, False
                 )
                 await db_session.commit()
                 await self.emit_user_is_offline(
-                    user_id=session.user_id, last_seen=updated_user.last_seen
+                    user_id=sio_session.user_id, last_seen=updated_user.last_seen
                 )
                 return SioAck.success().to_json()
             except Exception as error:
@@ -208,15 +211,17 @@ class SioController(AsyncNamespace):
 
     @check_authorization
     async def on_put_app_in_foreground(
-        self, sid, data=None, session: AuthorizedSioSession = None
+        self, sid, data=None, sio_session: SioSession = None
     ):
         self._logger.debug(f"[{sid}] got event (put_app_in_foreground)\n")
-        await self.emit_user_is_online(session.user_id)
+        await self.emit_user_is_online(sio_session.user_id)
 
         # * Set user online
         async with Database.session_maker() as db_session:
             try:
-                await UserRepository.toggle_online(db_session, session.user_id, True)
+                await UserRepository.toggle_online(
+                    db_session, sio_session.user_id, True
+                )
                 await db_session.commit()
                 return SioAck.success().to_json()
             except Exception as error:
@@ -228,26 +233,32 @@ class SioController(AsyncNamespace):
 
     @check_authorization
     async def on_join_to_post_room(
-        self, sid, data: dict | None = None, session: AuthorizedSioSession = None
+        self, sid, data: dict | None = None, sio_session: SioSession = None
     ):
         if not isinstance(data, dict):
             return SioAck.failed(error_text="Post id must be specified")
         post_id = data.get("post_id")
         if post_id is None:
             return SioAck.failed(error_text="Post id must be specified")
-        await self.enter_room(sid=sid, room=SioRooms.get_post_room(post_id=post_id))
+        post_room = SioRooms.get_post_room(post_id=post_id)
+        await self.enter_room(sid=sid, room=post_room)
+        self._logger.info(
+            f"User({sio_session.user_id}) joined the room ({post_room})\n"
+        )
         return SioAck.success()
 
     @check_authorization
     async def on_leave_from_post_room(
-        self, sid, data: dict | None = None, session: AuthorizedSioSession = None
+        self, sid, data: dict | None = None, sio_session: SioSession = None
     ):
         if not isinstance(data, dict):
             return SioAck.failed(error_text="Post id must be specified")
         post_id = data.get("post_id")
         if post_id is None:
             return SioAck.failed(error_text="Post id must be specified")
-        await self.leave_room(sid=sid, room=SioRooms.get_post_room(post_id=post_id))
+        post_room = SioRooms.get_post_room(post_id=post_id)
+        await self.leave_room(sid=sid, room=post_room)
+        self._logger.info(f"User({sio_session.user_id}) left the room ({post_room})\n")
         return SioAck.success()
 
     # * ------------------------ Emitters ------------------------
@@ -275,33 +286,38 @@ class SioController(AsyncNamespace):
 
     async def emit_new_follower(
         self,
-        target_sid: str | None,
+        subscruber_id: str | None,
         follower_id: str,
         follower_username: str,
     ):
-        if target_sid:
+        subscruber_sids = await SessionStore.get_sids_by_user_id(subscruber_id)
+        if subscruber_sids:
             await self.emit(
                 event="new_follower",
                 data={
                     "follower_id": follower_id,
                     "follower_username": follower_username,
                 },
-                to=target_sid,
+                to=list(subscruber_sids),
             )
 
     async def emit_new_comment(
-        self, new_comment: Comment, post_author_sid: str | None = None
+        self,
+        new_comment: Comment,
+        post_author_id: str,
     ):
+        json_comment = new_comment.to_json(include_reply=True)
         await self.emit(
             "new_comment",
-            data={"new_comment": new_comment.to_json(include_reply=True)},
+            data={"new_comment": json_comment},
             room=SioRooms.get_post_room(post_id=new_comment.post_id),
         )
-        if post_author_sid:
+        post_author_sids = await SessionStore.get_sids_by_user_id(user_id=post_author_id)
+        if post_author_id:
             await self.emit(
                 "new_comment_on_your_post",
-                data={"new_comment": new_comment.to_json(include_reply=True)},
-                to=post_author_sid,
+                data={"new_comment": json_comment},
+                to=list(post_author_sids),
             )
 
     async def emit_comment_deleted(
@@ -326,28 +342,6 @@ class SioController(AsyncNamespace):
             "post_deleted",
             data={
                 "post_id": post_id,
-            },
-            room=SioRooms.get_post_room(post_id=post_id),
-        )
-
-    async def emit_post_likes_count_changed(self, post_id: str, new_likes_count: int):
-        await self.emit(
-            "post_likes_count_changed",
-            data={
-                "post_id": post_id,
-                "new_likes_count": new_likes_count,
-            },
-            room=SioRooms.get_post_room(post_id=post_id),
-        )
-
-    async def emit_post_comments_count_changed(
-        self, post_id: str, new_comments_count: int
-    ):
-        await self.emit(
-            "post_comments_count_changed",
-            data={
-                "post_id": post_id,
-                "new_comments_count": new_comments_count,
             },
             room=SioRooms.get_post_room(post_id=post_id),
         )

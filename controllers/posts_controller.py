@@ -210,9 +210,6 @@ class PostsController:
             user_id=request.user_id,
             logger=self._logger,
         )
-        await self._sio.emit_post_likes_count_changed(
-            post_id=post_id, new_likes_count=len(liked_post.liked_by)
-        )
         return json_response(
             data=liked_post.to_json(detect_rels_for_user_id=request.user_id)
         )
@@ -227,9 +224,6 @@ class PostsController:
             session=request.db_session,
             target_post_id=post_id,
             user_id=request.user_id,
-        )
-        await self._sio.emit_post_likes_count_changed(
-            post_id=post_id, new_likes_count=len(updated_post.liked_by)
         )
         return json_response(
             data=updated_post.to_json(detect_rels_for_user_id=request.user_id)

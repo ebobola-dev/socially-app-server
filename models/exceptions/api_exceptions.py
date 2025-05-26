@@ -184,7 +184,7 @@ class AlreadyFollowingError(ConflictError):
 class NotFollowingAnywayError(ConflictError):
     def __init__(self, sub_username, target_username):
         super().__init__(
-            conflict_type=ApiConflictType.NOT_FOLLWING,
+            conflict_type=ApiConflictType.NOT_FOLLOWING,
             server_message=f"@{sub_username} not following @{target_username} anyway",
         )
 

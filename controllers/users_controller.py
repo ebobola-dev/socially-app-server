@@ -350,22 +350,21 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        updated_user = await UserRepository.follow(
+        updated_target_user = await UserRepository.follow(
             request.db_session, user_id, target_id
         )
 
         target_user = await UserRepository.get_by_id_with_relations(
             request.db_session, target_id
         )
-        if target_user.current_sid:
-            await self._sio.emit_new_follower(
-                target_sid=target_user.current_sid,
-                follower_id=user_id,
-                follower_username=updated_user.username,
-            )
+        await self._sio.emit_new_follower(
+            subscruber_id=target_user.id,
+            follower_id=user_id,
+            follower_username=updated_target_user.username,
+        )
         return json_response(
             {
-                "updated_user": updated_user.to_json(
+                "updated_user": updated_target_user.to_json(
                     safe=True, detect_rels_for_user_id=request.user_id
                 )
             }
@@ -381,12 +380,12 @@ class UsersController:
                     "target_id": "must be specified in query",
                 }
             )
-        updated_user = await UserRepository.unfollow(
+        updated_target_user = await UserRepository.unfollow(
             request.db_session, user_id, target_id
         )
         return json_response(
             {
-                "updated_user": updated_user.to_json(
+                "updated_user": updated_target_user.to_json(
                     safe=True, detect_rels_for_user_id=request.user_id
                 )
             }

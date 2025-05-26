@@ -72,7 +72,6 @@ class CommentsController:
             session=request.db_session,
             comment_id=comment_id,
         )
-        self._logger.debug(f"comment: {comment}, bool: {bool(comment)}")
         if not comment:
             raise CommentNotFoundError(comment_id)
         post = await PostRepository.get_by_id_with_relations(
@@ -92,9 +91,6 @@ class CommentsController:
             target_comment_id=comment_id,
         )
         await self._sio.emit_comment_deleted(post_id=post.id, comment_id=comment_id)
-        await self._sio.emit_post_comments_count_changed(
-            post_id=post.id, new_comments_count=len(post.comments)
-        )
         return json_response()
 
     @authenticate()
@@ -156,10 +152,7 @@ class CommentsController:
         )
         await self._sio.emit_new_comment(
             new_comment=new_comment,
-            post_author_sid=post_author.current_sid,
-        )
-        await self._sio.emit_post_comments_count_changed(
-            post_id=post_id, new_comments_count=len(target_post.comments)
+            post_author_id=post_author.id,
         )
         return json_response(
             data=new_comment.to_json(

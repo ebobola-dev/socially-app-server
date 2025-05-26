@@ -242,8 +242,7 @@ class UserRepository:
         subscriber.following.append(target)
         try:
             await session.flush()
-            await session.refresh(subscriber)
-            return subscriber
+            return target
         except Exception as error:
             await session.rollback()
             raise DatabaseError(server_message=f"[User | follow] {error}")
@@ -272,8 +271,7 @@ class UserRepository:
         subscriber.following.remove(target)
         try:
             await session.flush()
-            await session.refresh(subscriber)
-            return subscriber
+            return target
         except Exception as error:
             await session.rollback()
             raise DatabaseError(server_message=f"[User | unfollow] {error}")

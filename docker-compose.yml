@@ -61,6 +61,12 @@ services:
       - minio_data:/data
     restart: unless-stopped
 
+  redis:
+    image: redis:8.0
+    container_name: socially-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+
 volumes:
   db_data:
   minio_data:
