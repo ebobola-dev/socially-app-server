@@ -326,11 +326,13 @@ class UsersController:
         )
         if not saved_user:
             raise UserNotFoundError(user_id)
+        old_avatar_key = saved_user.avatar_key
         updated_user = await UserRepository.delete_avatar(request.db_session, user_id)
-        await MinioService.delete(
-            bucket=Buckets.avatars,
-            key=saved_user.avatar_key,
-        )
+        if old_avatar_key:
+            await MinioService.delete(
+                bucket=Buckets.avatars,
+                key=old_avatar_key,
+            )
         self._logger.debug(f"@{saved_user.username} deleted avatar")
         return json_response(
             data={
