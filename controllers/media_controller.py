@@ -30,7 +30,10 @@ class MediaController:
             key=key,
         )
         stream_response = StreamResponse(
-            headers={"Content-Type": stat.content_type or "application/octet-stream"}
+            headers={
+                "Content-Type": stat.content_type or "application/octet-stream",
+                "Content-Length": str(stat.size),
+            }
         )
         self._logger.debug(f"{stat=}")
         await stream_response.prepare(request)
