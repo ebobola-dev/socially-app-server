@@ -19,7 +19,6 @@ from models.base import BaseModel
 from models.message_attachment_type import MessageAType
 
 if TYPE_CHECKING:
-    from models.chat import Chat
     from models.post import Post
     from models.user import User
 
@@ -72,14 +71,14 @@ class Message(BaseModel):
     )
 
     #* Relationships
-    chat: Mapped["Chat"] = relationship(
-        "Chat",
-        back_populates="messages"
-    )
-
     sender: Mapped["User"] = relationship("User", foreign_keys=[sender_id])
     recipient: Mapped["User"] = relationship("User", foreign_keys=[recipient_id])
 
+    chat = relationship(
+        'Chat',
+        back_populates='messages',
+        foreign_keys=[chat_id]
+    )
     attached_message: Mapped["Message | None"] = relationship(
         "Message",
         foreign_keys=[attached_message_id],

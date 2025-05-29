@@ -67,7 +67,8 @@ class Chat(BaseModel):
         "Message",
         back_populates="chat",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+        foreign_keys='Message.chat_id',
     )
 
     def __repr__(self):

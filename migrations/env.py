@@ -38,6 +38,8 @@ from models.refresh_token import RefreshToken
 from models.apk_update import ApkUpdate
 from models.post import Post
 from models.comment import Comment
+from models.chat import Chat
+from models.message import Message
 from models.base import BaseModel
 target_metadata = BaseModel.metadata
 

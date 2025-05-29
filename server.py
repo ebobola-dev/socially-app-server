@@ -22,10 +22,9 @@ from controllers.sio_controller import SioController
 from controllers.test_users_controller import TestUsersController
 from controllers.users_controller import UsersController
 from database.database import Database
-from models.comment import Comment  # noqa: F401
-from models.post import Post  # noqa: F401
+from models.chat import Chat  # noqa: F401
+from models.message import Message  # noqa: F401
 from models.post_likes import post_likes  # noqa: F401
-from models.user import User  # noqa: F401
 from services.minio_service import MinioService
 from services.session_store import SessionStore
 from services.test_users import TestUsers
