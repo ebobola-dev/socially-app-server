@@ -216,13 +216,15 @@ class OwnerNotExistError(ValidationError):
 
 
 class ImageIsTooLargeError(BadRequestError):
-    def __init__(self, request_content_length: str = "?"):
+    def __init__(self, request_content_length: str = "?", filename: str = "?"):
         str_size = "?"
         if request_content_length.isdigit():
             str_size = SizeUtils.bytes_to_human_readable(int(request_content_length))
         super().__init__(
-            f"Image is too large ({str_size})",
-            [f"Image is too large (max: {ServerConfig.MAX_IMAGE_SIZE}MB)"],
+            server_message=f"Image({filename}) is too large ({str_size})",
+            global_errors=[
+                f"Image({filename}) is too large (max: {ServerConfig.MAX_IMAGE_SIZE}MB)"
+            ],
         )
 
 
@@ -285,10 +287,10 @@ class OtpCodeIsOutdatedError(BadRequestError):
 
 
 class UserNotFoundError(BadRequestError):
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, error_message: str = "User not found"):
         super().__init__(
             server_message=f"Could not found user with id ({user_id})",
-            global_errors=["User not found"],
+            global_errors=[error_message],
         )
 
 
@@ -372,14 +374,14 @@ class PostNoImagesError(BadRequestError):
         super().__init__("The post must contain at least one image")
 
 
-class ToManyImagesInPostError(BadRequestError):
+class TooManyImagesInPostError(BadRequestError):
     def __init__(self):
         super().__init__(
             f"Post can contain no more that {ServerConfig.MAX_IMAGES_IN_POST} images"
         )
 
 
-class ToManyImagesInMessageError(BadRequestError):
+class TooManyImagesInMessageError(BadRequestError):
     def __init__(self):
         super().__init__(
             f"Message can contain no more that {ServerConfig.MAX_IMAGES_IN_MESSAGE} images"
@@ -387,10 +389,10 @@ class ToManyImagesInMessageError(BadRequestError):
 
 
 class PostNotFoundError(BadRequestError):
-    def __init__(self, post_id: str):
+    def __init__(self, post_id: str, error_message: str = "Post not found"):
         super().__init__(
             server_message=f"Could not found post with id ({post_id})",
-            global_errors=["Post not found"],
+            global_errors=[error_message],
         )
 
 
@@ -466,3 +468,73 @@ class MinioError(ApiError):
         super().__init__(
             server_message=f"Minio error: {error}",
         )
+
+
+class UserIdNotSpecifiedError(ValidationError):
+    def __init__(
+        self,
+        field_name: str = "user_id",
+        error_text: str = "must be specified in query",
+    ):
+        fc_error = {field_name: error_text}
+        super().__init__(field_specific_erros=fc_error)
+
+
+class MessageIdNotSpecifiedError(ValidationError):
+    def __init__(
+        self,
+        field_name: str = "message_id",
+        error_text: str = "must be specified in query",
+    ):
+        fc_error = {field_name: error_text}
+        super().__init__(field_specific_erros=fc_error)
+
+
+class MessageNotFoundError(BadRequestError):
+    def __init__(self, message_id: str, error_message: str = "Message not found"):
+        super().__init__(
+            server_message=f"Could not found message with id ({message_id})",
+            global_errors=[error_message],
+        )
+
+
+class ChatNotFoundError(BadRequestError):
+    def __init__(self, chat_id: str):
+        super().__init__(
+            server_message=f"Could not found chat with id ({chat_id})",
+            global_errors=["Chat not found"],
+        )
+
+
+class InvalidMessageAttachmentError(BadRequestError):
+    def __init__(self, description: str = "No description"):
+        super().__init__(
+            server_message=description,
+            global_errors=[description],
+        )
+
+
+class ForbiddenToDeleteMessageError(ForbiddenError):
+    def __init__(self, one_global_error="You can't delete someone else's message"):
+        super().__init__("Forbidden to delete message", [one_global_error])
+
+
+class ForbiddenToReadMessageError(ForbiddenError):
+    def __init__(
+        self,
+        one_global_error="You are not allowed to mark this message as read",
+    ):
+        super().__init__("Forbidden to mark as readed message", [one_global_error])
+
+
+class ForbiddenToAttachMessageError(ForbiddenError):
+    def __init__(
+        self,
+        one_global_error="You are not allowed to attach this message",
+    ):
+        super().__init__("Forbidden to attach message", [one_global_error])
+
+
+class SerializeError(ApiError):
+    def __init__(self, description: str = "Serialize error"):
+        super().__init__(server_message=description)

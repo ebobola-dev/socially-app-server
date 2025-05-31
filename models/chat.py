@@ -48,7 +48,6 @@ class Chat(BaseModel):
             ondelete="SET NULL",
             use_alter=True,
             name="fk_chats_last_message_id",
-            deferrable=True,
         ),
         nullable=True,
     )
@@ -57,35 +56,59 @@ class Chat(BaseModel):
         nullable=True,
     )
 
-    #* Relationships
+    # * Relationships
     user1: Mapped["User"] = relationship("User", foreign_keys=[user1_id])
     user2: Mapped["User"] = relationship("User", foreign_keys=[user2_id])
 
-    last_message: Mapped["Message | None"] = relationship("Message", foreign_keys=[last_message_id])
+    last_message: Mapped["Message | None"] = relationship(
+        "Message", foreign_keys=[last_message_id]
+    )
 
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="chat",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        foreign_keys='Message.chat_id',
+        foreign_keys="Message.chat_id",
     )
 
     def __repr__(self):
         return f"<Chat>({self.user1_id} <-> {self.user2_id})"
 
-    # def to_json(self, include_reply=False, detect_rels_for_user_id: str | None = None):
-    #     json_view = super().to_json(safe=False, short=False)
-    #     json_view["author"] = self.author.to_json(
-    #         short=True, detect_rels_for_user_id=detect_rels_for_user_id
-    #     )
-    #     if include_reply:
-    #         json_view["reply_to"] = None
-    #         if self.reply_to is not None:
-    #             json_view["reply_to"] = self.reply_to.to_json(
-    #                 detect_rels_for_user_id=detect_rels_for_user_id
-    #             )
-    #     if detect_rels_for_user_id:
-    #         json_view["is_our"] = detect_rels_for_user_id == self.author_id
-    #         json_view["is_our_post"] = detect_rels_for_user_id == self.post.author_id
-    #     return json_view
+    @property
+    def is_self_chat(self) -> bool:
+        return self.user1_id == self.user2_id
+
+    @staticmethod
+    def new(user1_id: str, user2_id: str):
+        return Chat(
+            user1_id=user1_id,
+            user2_id=user2_id,
+        )
+
+    def to_json(
+        self,
+        detect_rels_for_user_id: str | None = None,
+    ):
+        json_view = super().to_json(False, False)
+
+        #% last message
+        if self.last_message_id:
+            json_view["last_message"] = self.last_message.to_json(
+                detect_rels_for_user_id=detect_rels_for_user_id,
+                short=True,
+            )
+
+        #% oppponent
+        if self.user1_id == detect_rels_for_user_id:
+            json_view['opponent'] = self.user2.to_json(
+                short=True,
+                detect_rels_for_user_id=detect_rels_for_user_id,
+            )
+        elif self.user2_id == detect_rels_for_user_id:
+            json_view['opponent'] = self.user1.to_json(
+                short=True,
+                detect_rels_for_user_id=detect_rels_for_user_id,
+            )
+
+        return json_view

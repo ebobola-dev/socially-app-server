@@ -16,7 +16,7 @@ from models.exceptions.api_exceptions import (
     PostIdNotSpecifiedError,
     PostNoImagesError,
     PostNotFoundError,
-    ToManyImagesInPostError,
+    TooManyImagesInPostError,
     ValidationError,
 )
 from models.pagination import Pagination
@@ -100,7 +100,7 @@ class PostsController:
                 case "images":
                     current_index = len(images)
                     if current_index == ServerConfig.MAX_IMAGES_IN_POST:
-                        raise ToManyImagesInPostError()
+                        raise TooManyImagesInPostError()
                     filename = part.filename
                     if not filename:
                         raise ValidationError(
@@ -185,10 +185,11 @@ class PostsController:
             raise PostNotFoundError(post_id)
         if post.author_id != request.user_id and not request.user_role.is_owner:
             raise ForbiddenError(global_errors=["You can't delete someone else's post"])
+        image_keys = post.image_keys.copy()
         deleted_post = await PostRepository.soft_delete(
             session=request.db_session, target_post_id=post_id
         )
-        for image_key in post.image_keys:
+        for image_key in image_keys:
             await MinioService.delete(
                 bucket=Buckets.posts,
                 key=f"{post.id}/{image_key}",

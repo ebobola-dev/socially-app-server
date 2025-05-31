@@ -345,3 +345,17 @@ class SioController(AsyncNamespace):
             },
             room=SioRooms.get_post_room(post_id=post_id),
         )
+
+    async def emit_user(
+        self,
+        user_id: str,
+        event: str,
+        data: dict,
+    ):
+        user_sids = await SessionStore.get_sids_by_user_id(user_id)
+        if user_sids:
+            await self.emit(
+                event=event,
+                data=data,
+                to=list(user_sids),
+            )

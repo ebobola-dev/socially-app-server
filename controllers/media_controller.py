@@ -4,7 +4,8 @@ from logging import Logger
 from aiohttp.web import Request, StreamResponse
 
 from controllers.middlewares import authenticate
-from models.exceptions.api_exceptions import ValidationError
+from models.exceptions.api_exceptions import ForbiddenError, ValidationError
+from repositories.message_repository import MessagesRepository
 from services.minio_service import Buckets, MinioService
 
 
@@ -35,7 +36,6 @@ class MediaController:
                 "Content-Length": str(stat.size),
             }
         )
-        self._logger.debug(f"{stat=}")
         await stream_response.prepare(request)
         chunk_size = 8192
         while True:
@@ -58,6 +58,21 @@ class MediaController:
                 }
             )
         folder = request.match_info["folder"]
+
+        #* Check message permission
+        if category == Buckets.messages:
+            message = await MessagesRepository.get_message_by_id(
+                session=request.db_session,
+                message_id=folder,
+                include_deleted=True,
+            )
+            if message:
+                if request.user_id not in (message.sender_id, message.recipient_id, ):
+                    raise ForbiddenError(
+                        server_message=f'Forbidden for uid:{request.user_id}'
+                    )
+        #* End check
+
         key = request.match_info["key"]
         data, stat = await MinioService.get(
             bucket=category,
@@ -66,7 +81,6 @@ class MediaController:
         stream_response = StreamResponse(
             headers={"Content-Type": stat.content_type or "application/octet-stream"}
         )
-        self._logger.debug(f"{stat=}")
         await stream_response.prepare(request)
         chunk_size = 8192
         while True:

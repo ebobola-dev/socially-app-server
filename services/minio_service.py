@@ -4,6 +4,7 @@ from enum import Enum
 from io import BytesIO
 
 from minio import Minio, S3Error
+from minio.commonconfig import CopySource
 
 from config.minio_config import MinioConfig
 from models.exceptions.api_exceptions import MinioError, MinioNotFoundError
@@ -159,6 +160,33 @@ class MinioService:
                 raise MinioError(error=error) from error
 
     @staticmethod
+    async def copy(
+        source_bucket: Buckets,
+        source_key: str,
+        to_bucket: Buckets | None = None,
+        new_key: str | None = None,
+    ):
+        if not MinioService.INITALIZED:
+            raise ServiceNotInitalizedButUsingError("MinioService")
+        to_bucket = to_bucket or source_bucket
+        new_key = new_key or source_key
+        try:
+            await asyncio.to_thread(
+                MinioService.instance.copy_object,
+                bucket_name=to_bucket.value,
+                object_name=new_key,
+                source=CopySource(
+                    bucket_name=source_bucket.value,
+                    object_name=source_key,
+                ),
+            )
+        except S3Error as error:
+            if error.code == "NoSuchKey":
+                raise MinioNotFoundError(key=source_key)
+            else:
+                raise MinioError(error=error) from error
+
+    @staticmethod
     async def delete(bucket: Buckets, key: str):
         if not MinioService.INITALIZED:
             raise ServiceNotInitalizedButUsingError("MinioService")
@@ -173,4 +201,3 @@ class MinioService:
                 raise MinioNotFoundError(key=key)
             else:
                 raise MinioError(error=error) from error
-

@@ -69,3 +69,11 @@ class Paths:
         AVATARS = f'{_base_path}/avatars/{{avatar_key}}'
         POSTS = f'{_base_path}/posts/{{post_id}}'
         MESSAGES = f'{_base_path}/messages/{{message_id}}'
+
+    class Messages:
+        _base_path = f'{_base_api_path}/messages'
+        GET_CHATS = f'{_base_api_path}/chats'
+        GET_MESSAGES = _base_path
+        CREATE_MESSAGE = _base_path
+        DELETE_MESSAGE = _base_path
+        MARK_READED = f'{_base_path}/mark_readed'

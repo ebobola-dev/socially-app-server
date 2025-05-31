@@ -123,7 +123,7 @@ class PostRepository:
         if not target_post:
             raise PostNotFoundError(target_post_id)
         target_post.text_content = ""
-        target_post.image_exts = []
+        target_post.image_keys = []
         target_post.deleted_at = datetime.now(timezone.utc)
         await session.flush()
         return target_post

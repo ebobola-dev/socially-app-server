@@ -9,11 +9,17 @@ from sqlalchemy import (
     DATE,
     DateTime,
     String,
+    inspect,
 )
 from sqlalchemy import (
     Enum as SqlAlchemyEnum,
 )
-from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
+from sqlalchemy.orm import (
+    Mapped,
+    backref,
+    mapped_column,
+    relationship,
+)
 
 from models.avatar_type import AvatarType
 from models.base import (
@@ -140,16 +146,20 @@ class User(BaseModel):
     ):
         json_view = super().to_json(safe, short)
         if detect_rels_for_user_id:
-            json_view['its_me'] = self.id == detect_rels_for_user_id
+            json_view["its_me"] = self.id == detect_rels_for_user_id
 
-            following_ids = map(lambda u: u.id, self.following)
-            followers_ids = map(lambda u: u.id, self.followers)
-            json_view['is_following'] = detect_rels_for_user_id in followers_ids
-            json_view['is_followed_by'] = detect_rels_for_user_id in following_ids
+            insp = inspect(self)
+            if 'following' not in insp.unloaded:
+                following_ids = map(lambda u: u.id, self.following)
+                json_view["is_followed_by"] = detect_rels_for_user_id in following_ids
+
+            if 'followers' not in insp.unloaded:
+                followers_ids = map(lambda u: u.id, self.followers)
+                json_view["is_following"] = detect_rels_for_user_id in followers_ids
 
         if not short:
-            json_view['following_count'] = len(self.following)
-            json_view['followers_count'] = len(self.followers)
+            json_view["following_count"] = len(self.following)
+            json_view["followers_count"] = len(self.followers)
             posts = tuple(filter(lambda p: not p.is_deleted, self.posts))
-            json_view['posts_count'] = len(posts)
+            json_view["posts_count"] = len(posts)
         return json_view

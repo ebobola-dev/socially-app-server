@@ -4,6 +4,7 @@ import sys
 import socketio
 from aiohttp import web
 
+import models  # noqa: F401
 from config.database_config import DatabaseConfig
 from config.email_config import EmailConfig
 from config.jwt_config import JwtConfig
@@ -15,6 +16,7 @@ from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
 from controllers.comments_controller import CommentsController
 from controllers.media_controller import MediaController
+from controllers.messages_controller import MessagesController
 from controllers.middlewares import Middlewares
 from controllers.posts_controller import PostsController
 from controllers.registration_controller import RegistrationController
@@ -22,9 +24,6 @@ from controllers.sio_controller import SioController
 from controllers.test_users_controller import TestUsersController
 from controllers.users_controller import UsersController
 from database.database import Database
-from models.chat import Chat  # noqa: F401
-from models.message import Message  # noqa: F401
-from models.post_likes import post_likes  # noqa: F401
 from services.minio_service import MinioService
 from services.session_store import SessionStore
 from services.test_users import TestUsers
@@ -110,6 +109,10 @@ async def main():
         main_sio_namespace=main_sio_namespace,
     )
     media_controller = MediaController(logger=MyLogger.get_logger("Media"))
+    messages_controller = MessagesController(
+        logger=MyLogger.get_logger("Messages"),
+        main_sio_namespace=main_sio_namespace,
+    )
 
     app.add_routes(
         [
@@ -175,6 +178,12 @@ async def main():
             # web.get(Paths.Media.MESSAGES, media_controller.get_message_image),
             web.get(Paths.Media.UNIVERSAL, media_controller.get),
             web.get(Paths.Media.WITH_FOLDER, media_controller.get_with_folder),
+            #
+            web.get(Paths.Messages.GET_CHATS, messages_controller.get_chats),
+            web.get(Paths.Messages.GET_MESSAGES, messages_controller.get_messages),
+            web.post(Paths.Messages.CREATE_MESSAGE, messages_controller.create_message),
+            web.delete(Paths.Messages.DELETE_MESSAGE, messages_controller.delete_message),
+            web.put(Paths.Messages.MARK_READED, messages_controller.mark_readed),
         ]
     )
 
