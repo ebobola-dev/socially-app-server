@@ -71,6 +71,7 @@ class PostRepository:
         session: AsyncSession,
         pagination=Pagination.default(),
         include_deleted: bool = False,
+        include_deleted_user: bool = False,
         user_id: str | None = None,
     ) -> list[Post]:
         query = (
@@ -99,6 +100,8 @@ class PostRepository:
         )
         if not include_deleted:
             query = query.where(Post.deleted_at.is_(None))
+        if not include_deleted_user:
+            query = query.join(Post.author).where(User.deleted_at.is_(None))
         if user_id:
             query = query.where(Post.author_id == user_id)
         result = await session.scalars(query)
