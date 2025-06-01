@@ -14,6 +14,7 @@ load_short_user_option = load_only(
     User.avatar_key,
     User.deleted_at,
     User.is_online,
+    User.last_seen,
 )
 
 load_full_post_options: list = [

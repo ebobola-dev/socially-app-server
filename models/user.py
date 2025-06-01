@@ -41,7 +41,14 @@ if TYPE_CHECKING:
 @safe_fields("email_address")
 @protected_from_json_fields("hashed_password", "current_sid")
 @short_fields(
-    "id", "username", "fullname", "avatar_key", "avatar_type", "is_online", "deleted_at"
+    "id",
+    "username",
+    "fullname",
+    "avatar_key",
+    "avatar_type",
+    "is_online",
+    "deleted_at",
+    "last_seen",
 )
 @allowed_to_update_fields(
     "username",
@@ -149,11 +156,11 @@ class User(BaseModel):
             json_view["its_me"] = self.id == detect_rels_for_user_id
 
             insp = inspect(self)
-            if 'following' not in insp.unloaded:
+            if "following" not in insp.unloaded:
                 following_ids = map(lambda u: u.id, self.following)
                 json_view["is_followed_by"] = detect_rels_for_user_id in following_ids
 
-            if 'followers' not in insp.unloaded:
+            if "followers" not in insp.unloaded:
                 followers_ids = map(lambda u: u.id, self.followers)
                 json_view["is_following"] = detect_rels_for_user_id in followers_ids
 

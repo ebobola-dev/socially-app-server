@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import selectinload
 
 from models.comment import Comment
 from models.exceptions.api_exceptions import (
@@ -12,6 +12,7 @@ from models.exceptions.api_exceptions import (
     PostNotFoundError,
     UserNotFoundError,
 )
+from models.loaders import load_short_user_option
 from models.pagination import Pagination
 from models.post import Post
 from models.user import User
@@ -44,15 +45,7 @@ class PostRepository:
             .where(Post.id == post_id)
             .options(
                 selectinload(Post.author).options(
-                    load_only(
-                        User.id,
-                        User.username,
-                        User.fullname,
-                        User.avatar_type,
-                        User.avatar_key,
-                        User.deleted_at,
-                        User.is_online,
-                    ),
+                    load_short_user_option,
                     selectinload(User.followers).load_only(User.id),
                     selectinload(User.following).load_only(User.id),
                 ),
@@ -78,15 +71,7 @@ class PostRepository:
             select(Post)
             .options(
                 selectinload(Post.author).options(
-                    load_only(
-                        User.id,
-                        User.username,
-                        User.fullname,
-                        User.avatar_type,
-                        User.avatar_key,
-                        User.deleted_at,
-                        User.is_online,
-                    ),
+                    load_short_user_option,
                     selectinload(User.followers).load_only(User.id),
                     selectinload(User.following).load_only(User.id),
                 ),
