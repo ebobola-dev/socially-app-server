@@ -143,20 +143,18 @@ class MessagesRepository:
         )
         if not chat:
             raise ChatNotFoundError(target_message.chat_id)
-        previous_message = None
-        if chat.last_message_id == target_message_id:
-            previous_message = await session.scalar(
-                select(Message)
-                .where(
-                    Message.chat_id == chat.id,
-                    Message.deleted_at.is_(None),
-                    Message.id != target_message_id,
-                )
-                .options(*load_full_message_options)
-                .order_by(Message.created_at.desc())
-                .limit(1)
+        previous_message = await session.scalar(
+            select(Message)
+            .where(
+                Message.chat_id == chat.id,
+                Message.deleted_at.is_(None),
+                Message.id != target_message_id,
             )
-
+            .options(*load_full_message_options)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        if chat.last_message_id == target_message_id:
             if previous_message:
                 chat.last_message_id = previous_message.id
                 chat.last_message_created_at = previous_message.created_at
