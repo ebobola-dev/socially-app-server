@@ -73,6 +73,7 @@ class MessagesController:
         target_user = await UserRepository.get_by_id(
             session=request.db_session,
             user_id=target_user_id,
+            include_deleted=True,
         )
         if not target_user:
             raise UserNotFoundError(
