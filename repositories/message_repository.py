@@ -143,7 +143,7 @@ class MessagesRepository:
         )
         if not chat:
             raise ChatNotFoundError(target_message.chat_id)
-        updated_chat_last_message = None
+        previous_message = None
         if chat.last_message_id == target_message_id:
             previous_message = await session.scalar(
                 select(Message)
@@ -160,14 +160,13 @@ class MessagesRepository:
             if previous_message:
                 chat.last_message_id = previous_message.id
                 chat.last_message_created_at = previous_message.created_at
-                updated_chat_last_message = previous_message
             else:
                 chat.last_message_id = None
                 chat.last_message_created_at = None
 
         target_message.deleted_at = datetime.now(timezone.utc)
         await session.flush()
-        return target_message, updated_chat_last_message
+        return target_message, previous_message
 
     @staticmethod
     async def create_chat(

@@ -370,7 +370,7 @@ class MessagesController:
         )
         (
             deleted_message,
-            updated_chat_last_message,
+            previous_message,
         ) = await MessagesRepository.soft_delete_message(
             session=request.db_session,
             target_message_id=message_id,
@@ -387,12 +387,12 @@ class MessagesController:
 
         json_chat_last_message_for_sender = None
         json_chat_last_message_for_recipient = None
-        if updated_chat_last_message:
-            json_chat_last_message_for_sender = updated_chat_last_message.to_json(
+        if previous_message:
+            json_chat_last_message_for_sender = previous_message.to_json(
                 short=True,
                 detect_rels_for_user_id=deleted_message.sender_id,
             )
-            json_chat_last_message_for_recipient = updated_chat_last_message.to_json(
+            json_chat_last_message_for_recipient = previous_message.to_json(
                 short=True,
                 detect_rels_for_user_id=deleted_message.recipient_id,
             )
@@ -403,7 +403,7 @@ class MessagesController:
             data={
                 "message_id": deleted_message.id,
                 "chat_opponent_id": deleted_message.recipient_id,
-                "updated_chat_last_message": json_chat_last_message_for_sender,
+                "previous_message": json_chat_last_message_for_sender,
             },
         )
         await self._sio.emit_user(
@@ -412,13 +412,13 @@ class MessagesController:
             data={
                 "message_id": deleted_message.id,
                 "chat_opponent_id": deleted_message.sender_id,
-                "updated_chat_last_message": json_chat_last_message_for_recipient,
+                "previous_message": json_chat_last_message_for_recipient,
             },
         )
         return json_response(
             {
                 "deleted_message": json_deleted_message,
-                "updated_chat_last_message": json_chat_last_message_for_sender,
+                "previous_message": json_chat_last_message_for_sender,
             }
         )
 
