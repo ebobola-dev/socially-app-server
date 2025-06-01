@@ -336,18 +336,22 @@ class MessagesController:
                 new_messages,
             )
         )
-        for js_msg_for_sender in json_messages_for_sender:
-            await self._sio.emit_user(
-                user_id=js_msg_for_sender.get("sender_id"),
-                event="new_message",
-                data=js_msg_for_sender,
-            )
-        for js_msg_for_target in json_messages_for_target:
-            await self._sio.emit_user(
-                user_id=js_msg_for_target.get("recipient_id"),
-                event="new_message",
-                data=js_msg_for_target,
-            )
+        await self._sio.emit_user(
+            user_id=request.user_id,
+            event="new_messages",
+            data={
+                "new_messages": json_messages_for_sender,
+                "chat_opponent_id": target_uid,
+            },
+        )
+        await self._sio.emit_user(
+            user_id=target_uid,
+            event="new_messages",
+            data={
+                "new_messages": json_messages_for_target,
+                "chat_opponent_id": request.user_id,
+            },
+        )
         return json_response({"new_messages": json_messages_for_sender})
 
     @authenticate()
@@ -447,8 +451,11 @@ class MessagesController:
         )
         await self._sio.emit_user(
             user_id=updated_message.sender_id,
-            event="message_readed",
-            data={"message_id": updated_message.id},
+            event="message_was_read",
+            data={
+                "message_id": updated_message.id,
+                "chat_opponent_id": updated_message.recipient_id,
+            },
         )
         return json_response(
             updated_message.to_json(detect_rels_for_user_id=request.user_id)
