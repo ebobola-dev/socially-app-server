@@ -2,6 +2,5 @@ from enum import Enum
 
 
 class MessageAType(Enum):
-    message = 1
-    post = 2
-    images = 3
+    post = 1
+    images = 2

@@ -14,7 +14,6 @@ from models.exceptions.api_exceptions import (
     ForbiddenToReadMessageError,
     ImageIsTooLargeError,
     InvalidImageError,
-    InvalidMessageAttachmentError,
     MessageIdNotSpecifiedError,
     MessageNotFoundError,
     PostNotFoundError,
@@ -24,15 +23,12 @@ from models.exceptions.api_exceptions import (
     ValidationError,
 )
 from models.message import Message
-from models.message_attachment_type import MessageAType
 from models.pagination import Pagination
 from repositories.message_repository import MessagesRepository
 from repositories.post_repository import PostRepository
 from repositories.user_repository import UserRepository
 from services.minio_service import Buckets, MinioService
 from utils.image_utils import ImageUtils, PillowValidatationResult
-from utils.my_validator.my_validator import ValidateField
-from utils.my_validator.rules import EnumRule
 
 
 class MessagesController:
@@ -124,10 +120,9 @@ class MessagesController:
         # ************************** Reading the input data **************************#
         reader = await request.multipart()
         text_content: str = ""
-        attachment_type = None
-        images = []
-        attached_message_id = None
-        attached_post_id = None
+        images: list[dict] = []
+        attached_message_id: str | None = None
+        attached_post_id: str | None = None
 
         async for part in reader:
             match part.name:
@@ -138,21 +133,6 @@ class MessagesController:
                         text_content = (await part.text()).strip()
                     except Exception:
                         raise ValidationError({"text": "must be a string field"})
-                case "attachment_type":
-                    if part.filename:
-                        raise ValidationError(
-                            {"attachment_type": "must be a string field"}
-                        )
-                    a_type_str = (await part.text()).strip()
-                    if not a_type_str:
-                        continue
-                    ValidateField(
-                        field_name=attachment_type,
-                        nullable=True,
-                        required=False,
-                        rules=[EnumRule(MessageAType)],
-                    )(a_type_str)
-                    attachment_type = MessageAType(int(a_type_str))
                 case "attached_message_id":
                     if part.filename:
                         raise ValidationError(
@@ -226,10 +206,6 @@ class MessagesController:
         # *********************** Check attached records exist ***********************#
 
         if attached_post_id:
-            if attachment_type != MessageAType.post:
-                raise InvalidMessageAttachmentError(
-                    "Post is attached but 'attachment_type' is not 'post'"
-                )
             attached_post = await PostRepository.get_by_id_with_relations(
                 session=request.db_session, post_id=attached_post_id
             )
@@ -240,10 +216,6 @@ class MessagesController:
                 )
         attached_message = None
         if attached_message_id:
-            if attachment_type != MessageAType.message:
-                raise InvalidMessageAttachmentError(
-                    "Message is attached but 'attachment_type' is not 'message'"
-                )
             attached_message = await MessagesRepository.get_message_by_id(
                 session=request.db_session,
                 message_id=attached_message_id,
@@ -261,15 +233,14 @@ class MessagesController:
 
         # ********************* End check attached records exist *********************#
 
-        attached_image_keys = (
+        attached_image_keys: list[str] = (
             list(map(lambda img_data: img_data["file_key"], images)) if images else None
         )
 
         # ************************** Attachment validation ************************** #
 
-        Message.validate_attachments(
+        attachment_type = Message.validate_attachments(
             text_content=text_content,
-            attachment_type=attachment_type,
             attached_image_keys=attached_image_keys,
             attached_message_id=attached_message_id,
             attached_post_id=attached_post_id,

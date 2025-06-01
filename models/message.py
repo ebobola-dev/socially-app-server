@@ -145,57 +145,31 @@ class Message(BaseModel):
     @staticmethod
     def validate_attachments(
         text_content: str | None,
-        attachment_type: MessageAType | None,
         attached_image_keys: list[str] | None,
         attached_post_id: str | None,
         attached_message_id: str | None,
-    ):
-        attachment_sources = {
-            "image": attached_image_keys,
-            "message": attached_message_id,
-            "post": attached_post_id,
-        }
-
-        present = {
-            k: v
-            for k, v in attachment_sources.items()
-            if v is not None and (not isinstance(v, list) or len(v) > 0)
-        }
-
-        if len(present) > 1:
+    ) -> MessageAType | None:
+        attachment_kinds = (
+            bool(attached_image_keys),
+            bool(attached_post_id),
+            bool(attached_message_id),
+        )
+        attachment_count = sum(attachment_kinds)
+        if attachment_count > 1:
             raise InvalidMessageAttachmentError(
                 "Only one type of attachment is allowed"
             )
-
-        if len(present) == 0:
-            if not text_content or text_content.strip() == "":
+        if attachment_count == 0:
+            if not text_content:
                 raise InvalidMessageAttachmentError(
                     "Message must have text or one attachment"
                 )
+        if attached_image_keys:
+            return MessageAType.images
+        if attached_post_id:
+            return MessageAType.post
+        return None
 
-        if len(present) == 1:
-            ((key, value),) = present.items()
-
-            if attachment_type is None:
-                raise InvalidMessageAttachmentError("Attachment type must be set")
-
-            if key == "image" and attachment_type != MessageAType.images:
-                raise InvalidMessageAttachmentError(
-                    "Attachment type must be IMAGE for images"
-                )
-            elif key == "message" and attachment_type != MessageAType.message:
-                raise InvalidMessageAttachmentError(
-                    "Attachment type must be MESSAGE for forwarded message"
-                )
-            elif key == "post" and attachment_type != MessageAType.post:
-                raise InvalidMessageAttachmentError(
-                    "Attachment type must be POST for attached post"
-                )
-        else:
-            if attachment_type is not None:
-                raise InvalidMessageAttachmentError(
-                    "Attachment type must be None when no attachment present"
-                )
 
     def to_json(
         self,
