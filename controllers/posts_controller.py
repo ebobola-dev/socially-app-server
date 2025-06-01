@@ -6,6 +6,7 @@ from aiohttp.web import Request, json_response
 
 from config.length_requirements import LengthRequirements
 from config.server_config import ServerConfig
+from controllers.helpers import parse_short_flag
 from controllers.middlewares import authenticate, content_type_is_multipart
 from controllers.sio_controller import SioController
 from models.exceptions.api_exceptions import (
@@ -25,12 +26,6 @@ from repositories.post_repository import PostRepository
 from services.minio_service import Buckets, MinioService
 from utils.image_utils import ImageUtils, PillowValidatationResult
 from utils.sizes import SizeUtils
-
-
-# * потом придумаю куда это лучше вынести по красоте, пока блюём
-def parse_short_flag(query: dict[str, str]) -> bool:
-    raw = query.get("short", "").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
 
 
 class PostsController:

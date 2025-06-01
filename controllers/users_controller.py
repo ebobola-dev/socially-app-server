@@ -9,6 +9,7 @@ from aiohttp.web_exceptions import HTTPNotImplemented
 
 from config.length_requirements import LengthRequirements
 from config.server_config import ServerConfig
+from controllers.helpers import parse_short_flag
 from controllers.middlewares import (
     authenticate,
     content_type_is_json,
@@ -61,11 +62,14 @@ class UsersController:
         user = await UserRepository.get_by_id_with_relations(
             request.db_session, user_id, include_deleted=True
         )
+        short_flag = parse_short_flag(request.query)
         if user is None:
             raise UserNotFoundError(user_id)
         return json_response(
             data=user.to_json(
-                safe=user_id == request.user_id, detect_rels_for_user_id=request.user_id
+                safe=user_id == request.user_id,
+                detect_rels_for_user_id=request.user_id,
+                short=short_flag,
             )
         )
 
