@@ -123,7 +123,7 @@ class MessagesRepository:
     async def soft_delete_message(
         session: AsyncSession,
         target_message_id: str,
-    ) -> Message:
+    ) -> tuple[Message, Message | None]:
         target_message = await MessagesRepository.get_message_by_id(
             session=session,
             message_id=target_message_id,
@@ -143,7 +143,7 @@ class MessagesRepository:
         )
         if not chat:
             raise ChatNotFoundError(target_message.chat_id)
-        chat_devastated = False
+        updated_chat_last_message = None
         if chat.last_message_id == target_message_id:
             previous_message = await session.scalar(
                 select(Message)
@@ -152,6 +152,7 @@ class MessagesRepository:
                     Message.deleted_at.is_(None),
                     Message.id != target_message_id,
                 )
+                .options(*load_full_message_options)
                 .order_by(Message.created_at.desc())
                 .limit(1)
             )
@@ -159,14 +160,14 @@ class MessagesRepository:
             if previous_message:
                 chat.last_message_id = previous_message.id
                 chat.last_message_created_at = previous_message.created_at
+                updated_chat_last_message = previous_message
             else:
                 chat.last_message_id = None
                 chat.last_message_created_at = None
-                chat_devastated = True
 
         target_message.deleted_at = datetime.now(timezone.utc)
         await session.flush()
-        return target_message, chat_devastated
+        return target_message, updated_chat_last_message
 
     @staticmethod
     async def create_chat(

@@ -368,7 +368,10 @@ class MessagesController:
             if target_message.attached_image_keys
             else []
         )
-        deleted_message, chat_devastated = await MessagesRepository.soft_delete_message(
+        (
+            deleted_message,
+            updated_chat_last_message,
+        ) = await MessagesRepository.soft_delete_message(
             session=request.db_session,
             target_message_id=message_id,
         )
@@ -378,22 +381,44 @@ class MessagesController:
                 key=f"{message_id}/{image_key}",
             )
 
+        json_deleted_message = deleted_message.to_json(
+            detect_rels_for_user_id=request.user_id,
+        )
+
+        json_chat_last_message_for_sender = None
+        json_chat_last_message_for_recipient = None
+        if updated_chat_last_message:
+            json_chat_last_message_for_sender = updated_chat_last_message.to_json(
+                short=True,
+                detect_rels_for_user_id=deleted_message.sender_id,
+            )
+            json_chat_last_message_for_recipient = updated_chat_last_message.to_json(
+                short=True,
+                detect_rels_for_user_id=deleted_message.recipient_id,
+            )
+
         await self._sio.emit_user(
             user_id=deleted_message.sender_id,
-            event="message_deleted",
-            data={"message_id": deleted_message.id, "chat_devastated": chat_devastated},
+            event="message_was_deleted",
+            data={
+                "message_id": deleted_message.id,
+                "chat_opponent_id": deleted_message.recipient_id,
+                "updated_chat_last_message": json_chat_last_message_for_sender,
+            },
         )
         await self._sio.emit_user(
             user_id=deleted_message.recipient_id,
-            event="message_deleted",
-            data={"message_id": deleted_message.id, "chat_devastated": chat_devastated},
+            event="message_was_deleted",
+            data={
+                "message_id": deleted_message.id,
+                "chat_opponent_id": deleted_message.sender_id,
+                "updated_chat_last_message": json_chat_last_message_for_recipient,
+            },
         )
         return json_response(
             {
-                "deleted_message": deleted_message.to_json(
-                    detect_rels_for_user_id=request.user_id,
-                ),
-                "chat_devastated": chat_devastated,
+                "deleted_message": json_deleted_message,
+                "updated_chat_last_message": json_chat_last_message_for_sender,
             }
         )
 
