@@ -4,6 +4,7 @@ from logging import Logger
 
 from aiohttp.web import Request, json_response
 
+from config.length_requirements import LengthRequirements
 from config.server_config import ServerConfig
 from controllers.middlewares import authenticate, content_type_is_multipart
 from controllers.sio_controller import SioController
@@ -134,6 +135,8 @@ class MessagesController:
                         text_content = (await part.text()).strip()
                     except Exception:
                         raise ValidationError({"text": "must be a string field"})
+                    if text_content > LengthRequirements.MessageTextContent.MAX:
+                        raise ValidationError({"text": "too long, max: 10000 characters"})
                 case "attached_message_id":
                     if part.filename:
                         raise ValidationError(
