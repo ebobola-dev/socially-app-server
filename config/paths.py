@@ -78,6 +78,6 @@ class Paths:
         DELETE_MESSAGE = _base_path
         MARK_READED = f'{_base_path}/mark_readed'
 
-    class Dashboard:
-        _base_path = f'{_base_api_path}/dashboard'
+    class Admin:
+        _base_path = f'{_base_api_path}/admin'
         GET_MINIO_STAT = f'{_base_path}/minio'

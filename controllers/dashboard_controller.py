@@ -6,7 +6,7 @@ from controllers.middlewares import authenticate, owner_role
 from services.minio_service import MinioService
 
 
-class DashboardController:
+class AdminController:
     def __init__(self, logger: Logger):
         self._logger = logger
 
