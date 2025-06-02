@@ -22,6 +22,42 @@ class Buckets(Enum):
     apks = "apks"
 
 
+class BucketStat:
+    def __init__(self, bucket: Buckets, total_objects: int, total_size: int):
+        self.bucket = bucket
+        self.total_objects = total_objects
+        self.total_size = total_size
+
+    def to_json(self):
+        return {
+            "bucket": self.bucket.value,
+            "total_objects": self.total_objects,
+            "total_size": self.total_size,
+        }
+
+
+class MinioStat:
+    def __init__(
+        self,
+        avatars_stat: BucketStat,
+        posts_stat: BucketStat,
+        messages_stat: BucketStat,
+        apks: BucketStat,
+    ):
+        self.avatars_stat = avatars_stat
+        self.posts_stat = posts_stat
+        self.messages_stat = messages_stat
+        self.apks = apks
+
+    def to_json(self):
+        return {
+            "avatars_stat": self.avatars_stat.to_json(),
+            "posts_stat": self.posts_stat.to_json(),
+            "messages_stat": self.messages_stat.to_json(),
+            "apks": self.apks.to_json(),
+        }
+
+
 class MinioService:
     INITALIZED: bool = False
     instance: Minio
@@ -201,3 +237,29 @@ class MinioService:
                 raise MinioNotFoundError(key=key)
             else:
                 raise MinioError(error=error) from error
+
+    @staticmethod
+    def get_bucket_stats_sync(bucket: Buckets) -> BucketStat:
+        total_size = 0
+        total_objects = 0
+        for obj in MinioService.instance.list_objects(bucket.value, recursive=True):
+            total_size += obj.size
+            total_objects += 1
+        return BucketStat(
+            bucket=bucket,
+            total_objects=total_objects,
+            total_size=total_size,
+        )
+
+    @staticmethod
+    async def get_all_stats() -> set[BucketStat]:
+        stats = await asyncio.gather(
+            *(
+                asyncio.to_thread(
+                    MinioService.get_bucket_stats_sync,
+                    bucket,
+                )
+                for bucket in Buckets
+            )
+        )
+        return set(stats)

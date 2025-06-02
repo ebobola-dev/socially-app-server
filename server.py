@@ -15,6 +15,7 @@ from config.server_config import ServerConfig
 from controllers.apk_update_controller import ApkUpdatesController
 from controllers.auth_conrtoller import AuthConrtoller
 from controllers.comments_controller import CommentsController
+from controllers.dashboard_controller import DashboardController
 from controllers.media_controller import MediaController
 from controllers.messages_controller import MessagesController
 from controllers.middlewares import Middlewares
@@ -113,6 +114,9 @@ async def main():
         logger=MyLogger.get_logger("Messages"),
         main_sio_namespace=main_sio_namespace,
     )
+    dashboard_controller = DashboardController(
+        logger=MyLogger.get_logger("Dashboard"),
+    )
 
     app.add_routes(
         [
@@ -184,6 +188,8 @@ async def main():
             web.post(Paths.Messages.CREATE_MESSAGE, messages_controller.create_message),
             web.delete(Paths.Messages.DELETE_MESSAGE, messages_controller.delete_message),
             web.put(Paths.Messages.MARK_READED, messages_controller.mark_readed),
+            #
+            web.get(Paths.Dashboard.GET_MINIO_STAT, dashboard_controller.get_minio_stat),
         ]
     )
 
