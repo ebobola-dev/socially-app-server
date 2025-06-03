@@ -135,7 +135,7 @@ class MessagesController:
                         text_content = (await part.text()).strip()
                     except Exception:
                         raise ValidationError({"text": "must be a string field"})
-                    if text_content > LengthRequirements.MessageTextContent.MAX:
+                    if len(text_content) > LengthRequirements.MessageTextContent.MAX:
                         raise ValidationError({"text": "too long, max: 10000 characters"})
                 case "attached_message_id":
                     if part.filename:
