@@ -53,6 +53,13 @@ class MessagesController:
                 chats,
             )
         )
+        for i, json_chat in enumerate(json_chats):
+            unread_count = await MessagesRepository.get_unread_count(
+                session=request.db_session,
+                chat_id=json_chat.get('id'),
+                messages_owner_id=json_chat.get('opponent').get('id'),
+            )
+            json_chats[i]['unread_count'] = unread_count
 
         return json_response(
             {
@@ -136,7 +143,9 @@ class MessagesController:
                     except Exception:
                         raise ValidationError({"text": "must be a string field"})
                     if len(text_content) > LengthRequirements.MessageTextContent.MAX:
-                        raise ValidationError({"text": "too long, max: 10000 characters"})
+                        raise ValidationError(
+                            {"text": "too long, max: 10000 characters"}
+                        )
                 case "attached_message_id":
                     if part.filename:
                         raise ValidationError(
@@ -191,7 +200,7 @@ class MessagesController:
                             source_extension=file_ext,
                         )
                     except VerifyImageError as img_verify_error:
-                        if img_verify_error.message == 'Unable to convert by magick':
+                        if img_verify_error.message == "Unable to convert by magick":
                             self._logger.exception(img_verify_error)
                         raise InvalidImageError(
                             field_name="images",

@@ -89,8 +89,10 @@ class Chat(BaseModel):
     def to_json(
         self,
         detect_rels_for_user_id: str | None = None,
+        unread_count: int = 0
     ):
         json_view = super().to_json(False, False)
+        json_view['unread_count'] = unread_count
 
         #% last message
         if self.last_message_id:

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
@@ -88,6 +88,26 @@ class MessagesRepository:
         )
         result = await session.scalars(query)
         return result.all()
+
+    @staticmethod
+    async def get_unread_count(
+        session: AsyncSession,
+        chat_id: str,
+        messages_owner_id: str,
+    ):
+        query = (
+            select(func.count())
+            .select_from(Message)
+            .where(
+                and_(
+                    Message.chat_id == chat_id,
+                    Message.readed.is_(False),
+                    Message.sender_id == messages_owner_id,
+                )
+            )
+        )
+        result = await session.execute(query)
+        return result.scalar_one()
 
     @staticmethod
     async def get_messages(
