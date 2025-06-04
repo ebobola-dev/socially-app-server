@@ -2,7 +2,7 @@ FROM python:3.13.3-slim
 
 WORKDIR /app
 
-RUN apt update && apt install -y \
+RUN apt update && apt install -y --no-install-recommends \
     build-essential \
     libffi-dev \
     libssl-dev \
@@ -11,6 +11,11 @@ RUN apt update && apt install -y \
     python3-dev \
     default-libmysqlclient-dev \
     tzdata \
+    imagemagick \
+    libjpeg-dev \
+    libpng-dev \
+    libwebp-dev \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=${TZ}

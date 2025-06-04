@@ -1,4 +1,3 @@
-import asyncio
 from io import BytesIO
 from logging import Logger
 
@@ -29,7 +28,7 @@ from repositories.message_repository import MessagesRepository
 from repositories.post_repository import PostRepository
 from repositories.user_repository import UserRepository
 from services.minio_service import Buckets, MinioService
-from utils.image_utils import ImageUtils, PillowValidatationResult
+from utils.image_utils import ImageUtils, VerifyImageError
 
 
 class MessagesController:
@@ -185,17 +184,19 @@ class MessagesController:
                             )
                         image_file_buffer.write(chunk)
                     image_file_buffer.seek(0)
-                    pillow_validation_result = await asyncio.to_thread(
-                        ImageUtils.is_valid_by_pillow, image_file_buffer
-                    )
-                    is_valid_by_filetype = await asyncio.to_thread(
-                        ImageUtils.is_valid_by_filetype, image_file_buffer
-                    )
-                    if (
-                        not is_valid_by_filetype
-                        or pillow_validation_result == PillowValidatationResult.invalid
-                    ):
-                        raise InvalidImageError(field_name="image", filename=filename)
+                    try:
+                        image_file_buffer = await ImageUtils.verify_image(
+                            source_buffer=image_file_buffer,
+                            source_extension=file_ext,
+                        )
+                    except VerifyImageError as img_verify_error:
+                        if img_verify_error.message == 'Unable to convert by magick':
+                            self._logger.exception(img_verify_error)
+                        raise InvalidImageError(
+                            field_name="images",
+                            filename=filename,
+                            server_message=img_verify_error.message,
+                        )
                     images.append(
                         {
                             "index": current_index,

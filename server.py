@@ -219,7 +219,6 @@ async def main():
 def run_server():
     if sys.platform != "win32":
         import uvloop
-
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     asyncio.run(main())
 

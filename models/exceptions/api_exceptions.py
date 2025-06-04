@@ -417,9 +417,14 @@ class CommentIdNotSpecifiedError(ValidationError):
 
 
 class InvalidImageError(ValidationError):
-    def __init__(self, filename: str, field_name: str = "image"):
-        fc_error = {field_name: f"invalid image file ({filename})"}
-        super().__init__(fc_error)
+    def __init__(
+        self,
+        filename: str,
+        field_name: str = "image",
+        server_message: str | None = None,
+    ):
+        fc_error = {field_name: f"Invalid image file ({filename})"}
+        super().__init__(field_specific_erros=fc_error, server_message=server_message)
 
 
 class AlreadyLikedError(ConflictError):

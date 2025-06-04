@@ -1,4 +1,3 @@
-import asyncio
 from datetime import date
 from io import BytesIO
 from logging import Logger
@@ -35,7 +34,7 @@ from models.role import Role
 from repositories.user_repository import UserRepository
 from services.minio_service import Buckets, MinioService
 from services.tokens_service import TokensService
-from utils.image_utils import ImageUtils, PillowValidatationResult
+from utils.image_utils import ImageUtils, VerifyImageError
 from utils.my_validator.my_validator import ValidateField, validate_request_body
 from utils.my_validator.rules import LengthRule
 from utils.sizes import SizeUtils
@@ -255,28 +254,19 @@ class UsersController:
                 raise ValidationError(
                     {"avatar": "file must be specified if avatar_type is external"}
                 )
-            pillow_validation_result = await asyncio.to_thread(
-                ImageUtils.is_valid_by_pillow, avatar_file_buffer
-            )
-            is_valid_by_filetype = await asyncio.to_thread(
-                ImageUtils.is_valid_by_filetype, avatar_file_buffer
-            )
-            self._logger.debug(
-                f"(update avatar) is valid by filetype: {is_valid_by_filetype}"
-            )
-            if pillow_validation_result == PillowValidatationResult.unable:
-                self._logger.warning(
-                    "(update avatar) pillow cannot determine the image format"
+            try:
+                avatar_file_buffer = await ImageUtils.verify_image(
+                    source_buffer=avatar_file_buffer,
+                    source_extension=file_ext,
                 )
-            else:
-                self._logger.debug(
-                    f"(update avatar) is valid by pillow: {pillow_validation_result.name}"
+            except VerifyImageError as img_verify_error:
+                if img_verify_error.message == 'Unable to convert by magick':
+                    self._logger.exception(img_verify_error)
+                raise InvalidImageError(
+                    field_name="avatar",
+                    filename=filename,
+                    server_message=img_verify_error.message,
                 )
-            if not (
-                pillow_validation_result != PillowValidatationResult.invalid
-                and is_valid_by_filetype
-            ):
-                raise InvalidImageError(field_name="avatar", filename=filename)
             new_avatar_key = f"{uuid4()}{file_ext}"
             if user.avatar_key is not None:
                 await MinioService.delete(
