@@ -101,8 +101,9 @@ class MessagesRepository:
             .where(
                 and_(
                     Message.chat_id == chat_id,
-                    Message.readed.is_(False),
                     Message.sender_id == messages_owner_id,
+                    Message.readed.is_(False),
+                    Message.deleted_at.is_(None),
                 )
             )
         )
