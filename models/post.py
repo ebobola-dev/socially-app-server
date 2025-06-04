@@ -4,9 +4,9 @@ from uuid import uuid4
 
 from sqlalchemy import (
     CHAR,
-    JSON,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     inspect,
 )
@@ -34,7 +34,7 @@ class Post(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     text_content: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
-    image_keys: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    images_count: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -70,16 +70,16 @@ class Post(BaseModel):
     def new(
         author_id: str,
         text_content: str,
-        image_keys: list[str],
+        images_count: int,
     ):
         return Post(
             author_id=author_id,
             text_content=text_content,
-            image_keys=image_keys,
+            images_count=images_count,
         )
 
     def __repr__(self):
-        return f"<Post>({self.id}, {self.created_at}, {self.image_keys})"
+        return f"<Post>({self.id}, {self.created_at}, {self.images_count})"
 
     @property
     def is_deleted(self) -> bool:
@@ -88,7 +88,6 @@ class Post(BaseModel):
     def to_json(self, detect_rels_for_user_id: str | None = None, short: bool = False):
         json_view = super().to_json(safe=False, short=short)
         if short:
-            json_view["first_image_key"] = self.image_keys[0] if self.image_keys else None
             return json_view
         json_view["author"] = self.author.to_json(
             short=True, detect_rels_for_user_id=detect_rels_for_user_id

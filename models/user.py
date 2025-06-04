@@ -88,7 +88,7 @@ class User(BaseModel):
     avatar_type: Mapped[AvatarType | None] = mapped_column(
         SqlAlchemyEnum(AvatarType), nullable=True
     )
-    avatar_key: Mapped[str | None] = mapped_column(String(41), nullable=True)
+    avatar_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     is_registration_completed: Mapped[BOOLEAN] = mapped_column(
         BOOLEAN(), nullable=False, default=False
     )

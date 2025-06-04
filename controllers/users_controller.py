@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 from io import BytesIO
 from logging import Logger
@@ -260,30 +261,35 @@ class UsersController:
                     source_extension=file_ext,
                 )
             except VerifyImageError as img_verify_error:
-                if img_verify_error.message == 'Unable to convert by magick':
+                if img_verify_error.message == "Unable to convert by magick":
                     self._logger.exception(img_verify_error)
                 raise InvalidImageError(
                     field_name="avatar",
                     filename=filename,
                     server_message=img_verify_error.message,
                 )
-            new_avatar_key = f"{uuid4()}{file_ext}"
-            if user.avatar_key is not None:
-                await MinioService.delete(
+            splitted_images = await asyncio.to_thread(
+                ImageUtils.split_image_sync,
+                image_buffer=avatar_file_buffer,
+            )
+            new_avatar_id = str(uuid4())
+            if user.avatar_id is not None:
+                await MinioService.delete_all_by_prefix(
                     bucket=Buckets.avatars,
-                    key=user.avatar_key,
+                    prefix=user.avatar_id,
                 )
             updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
                 user_id=user.id,
                 new_avatar_type=avatar_type,
-                new_avatar_key=new_avatar_key,
+                new_avatar_id=new_avatar_id,
             )
-            await MinioService.save(
-                bucket=Buckets.avatars,
-                key=new_avatar_key,
-                bytes=avatar_file_buffer,
-            )
+            for size, buffer in splitted_images.items():
+                await MinioService.save(
+                    bucket=Buckets.avatars,
+                    key=f"{new_avatar_id}/{size.str_view}{file_ext}",
+                    bytes=buffer,
+                )
             self._logger.debug(f"(update avatar) @{user.username} uploaded new avatar")
             return json_response(
                 data={
@@ -294,9 +300,9 @@ class UsersController:
             )
         else:
             if user.avatar_type is AvatarType.external:
-                await MinioService.delete(
+                await MinioService.delete_all_by_prefix(
                     bucket=Buckets.avatars,
-                    key=user.avatar_key,
+                    prefix=user.avatar_id,
                 )
             updated_user = await UserRepository.update_avatar(
                 session=request.db_session,
@@ -320,12 +326,12 @@ class UsersController:
         )
         if not saved_user:
             raise UserNotFoundError(user_id)
-        old_avatar_key = saved_user.avatar_key
+        old_avatar_id = saved_user.avatar_id
         updated_user = await UserRepository.delete_avatar(request.db_session, user_id)
-        if old_avatar_key:
-            await MinioService.delete(
+        if old_avatar_id:
+            await MinioService.delete_all_by_prefix(
                 bucket=Buckets.avatars,
-                key=old_avatar_key,
+                prefix=old_avatar_id,
             )
         self._logger.debug(f"@{saved_user.username} deleted avatar")
         return json_response(

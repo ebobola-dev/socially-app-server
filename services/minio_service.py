@@ -13,6 +13,7 @@ from models.exceptions.initalize_exceptions import (
     ServiceNotInitalizedButUsingError,
     UnableToInitializeServiceError,
 )
+from models.image_sizes import ImageSizes
 
 
 class Buckets(Enum):
@@ -20,6 +21,10 @@ class Buckets(Enum):
     posts = "posts"
     messages = "messages"
     apks = "apks"
+
+    @property
+    def is_image_bucket(self):
+        return self != Buckets.apks
 
 
 class BucketStat:
@@ -92,66 +97,6 @@ class MinioService:
         mime, _ = mimetypes.guess_type(filename)
         return mime or "application/octet-stream"
 
-    # @staticmethod
-    # async def save_avatar(
-    #     avatar_id: str,
-    #     original_bytes: BytesIO,
-    #     original_filename: str,
-    # ):
-    #     if not MinioService.INITALIZED:
-    #         raise ServiceNotInitalizedButUsingError("MinioService")
-    #     try:
-    #         original_content_type = MinioService.guess_mime_type(original_filename)
-    #         splitted_images = ImageUtils.split(original=original_bytes)
-    #         for str_size, buffer in splitted_images.items():
-    #             buffer.seek(0)
-    #             size = buffer.getbuffer().nbytes
-    #             content_type = original_content_type if str_size == 'original' else 'image/jpeg'
-    #             await asyncio.to_thread(
-    #                 MinioService.instance.put_object,
-    #                 bucket_name=Buckets.avatars.value,
-    #                 object_name=f"{avatar_id}/{str_size}.jpg",
-    #                 data=buffer,
-    #                 content_type=content_type,
-    #                 length=size,
-    #             )
-
-    #         # original_bytes.seek(0)
-    #         # content_type = MinioService.guess_mime_type(original_filename)
-    #         # size = original_bytes.getbuffer().nbytes
-    #         # original_bytes.seek(0)
-    #         # await asyncio.to_thread(
-    #         #     MinioService.instance.put_object,
-    #         #     bucket_name=Buckets.avatars.value,
-    #         #     object_name=f"{avatar_id}/{original_filename}",
-    #         #     data=original_bytes,
-    #         #     length=size,
-    #         #     content_type=content_type,
-    #         # )
-    #         return f"avatar/{avatar_id}"
-    #     except S3Error as error:
-    #         raise MinioError(error=error) from error
-
-    # @staticmethod
-    # async def get_image(bucket: Buckets, key: str):
-    #     if not MinioService.INITALIZED:
-    #         raise ServiceNotInitalizedButUsingError("MinioService")
-    #     try:
-    #         data = await asyncio.to_thread(
-    #             MinioService.instance.get_object,
-    #             bucket_name=bucket.value,
-    #             object_name=key,
-    #         )
-    #         stat = await asyncio.to_thread(
-    #             MinioService.instance.stat_object, bucket.value, key
-    #         )
-    #         return data, stat
-    #     except S3Error as error:
-    #         if error.code == "NoSuchKey":
-    #             raise MinioNotFoundError(key=key)
-    #         else:
-    #             raise MinioError(error=error) from error
-
     @staticmethod
     async def save(
         bucket: Buckets, key: str, bytes: BytesIO, filename: str | None = None
@@ -196,6 +141,37 @@ class MinioService:
                 raise MinioError(error=error) from error
 
     @staticmethod
+    async def get_first_with_prefix(bucket: Buckets, prefix: str):
+        if not MinioService.INITALIZED:
+            raise ServiceNotInitalizedButUsingError("MinioService")
+        try:
+            objects = tuple(
+                await asyncio.to_thread(
+                    MinioService.instance.list_objects,
+                    bucket_name=bucket.value,
+                    prefix=prefix,
+                    recursive=True,
+                )
+            )
+            if not objects:
+                raise MinioNotFoundError(key=f"prefix: {prefix}")
+            key = objects[0].object_name
+            data = await asyncio.to_thread(
+                MinioService.instance.get_object,
+                bucket_name=bucket.value,
+                object_name=key,
+            )
+            stat = await asyncio.to_thread(
+                MinioService.instance.stat_object, bucket.value, key
+            )
+            return data, stat
+        except S3Error as error:
+            if error.code == "NoSuchKey":
+                raise MinioNotFoundError(key=f"prefix: {prefix}")
+            else:
+                raise MinioError(error=error) from error
+
+    @staticmethod
     async def copy(
         source_bucket: Buckets,
         source_key: str,
@@ -223,6 +199,45 @@ class MinioService:
                 raise MinioError(error=error) from error
 
     @staticmethod
+    async def copy_message_images(
+        source_msg_id: str,
+        to_msg_id: str,
+    ):
+        if not MinioService.INITALIZED:
+            raise ServiceNotInitalizedButUsingError("MinioService")
+        try:
+            objects = tuple(
+                await asyncio.to_thread(
+                    MinioService.instance.list_objects,
+                    bucket_name=Buckets.messages.value,
+                    prefix=source_msg_id,
+                    recursive=True,
+                )
+            )
+            if not objects:
+                raise MinioNotFoundError(key=f"messages by prefix: {source_msg_id}")
+            for obj in objects:
+                source_object_name = obj.object_name
+                new_object_name = source_object_name.replace(
+                    source_msg_id,
+                    to_msg_id,
+                )
+                await asyncio.to_thread(
+                    MinioService.instance.copy_object,
+                    bucket_name=Buckets.messages.value,
+                    object_name=new_object_name,
+                    source=CopySource(
+                        bucket_name=Buckets.messages.value,
+                        object_name=source_object_name,
+                    ),
+                )
+        except S3Error as error:
+            if error.code == "NoSuchKey":
+                raise MinioNotFoundError(key=f"messages by prefix: {source_msg_id}")
+            else:
+                raise MinioError(error=error) from error
+
+    @staticmethod
     async def delete(bucket: Buckets, key: str):
         if not MinioService.INITALIZED:
             raise ServiceNotInitalizedButUsingError("MinioService")
@@ -235,6 +250,33 @@ class MinioService:
         except S3Error as error:
             if error.code == "NoSuchKey":
                 raise MinioNotFoundError(key=key)
+            else:
+                raise MinioError(error=error) from error
+
+    @staticmethod
+    async def delete_all_by_prefix(bucket: Buckets, prefix: str):
+        if not MinioService.INITALIZED:
+            raise ServiceNotInitalizedButUsingError("MinioService")
+        try:
+            objects = tuple(
+                await asyncio.to_thread(
+                    MinioService.instance.list_objects,
+                    bucket_name=bucket.value,
+                    prefix=prefix,
+                    recursive=True,
+                )
+            )
+            if not objects:
+                raise MinioNotFoundError(key=f"prefix: {prefix}")
+            for obj in objects:
+                await asyncio.to_thread(
+                    MinioService.instance.remove_object,
+                    bucket_name=bucket.value,
+                    object_name=obj.object_name,
+                )
+        except S3Error as error:
+            if error.code == "NoSuchKey":
+                raise MinioNotFoundError(key=f"prefix: {prefix}")
             else:
                 raise MinioError(error=error) from error
 
@@ -263,3 +305,25 @@ class MinioService:
             )
         )
         return set(stats)
+
+    @staticmethod
+    async def find_existing_with_size(
+        bucket: Buckets,
+        prefix: str,
+        requested_size: ImageSizes,
+    ) -> str:
+        for size in ImageSizes.get_next_available_size(requested_size):
+            try:
+                objects = tuple(
+                    await asyncio.to_thread(
+                        MinioService.instance.list_objects,
+                        bucket_name=bucket.value,
+                        prefix=f'{prefix}/{size.str_view}',
+                    )
+                )
+                if objects:
+                    return objects[0].object_name
+            except S3Error as e:
+                if e.code != "NoSuchKey":
+                    raise MinioError(error=e) from e
+        raise MinioNotFoundError(key=f'{prefix=}, {requested_size=}')

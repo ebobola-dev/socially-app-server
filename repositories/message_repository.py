@@ -133,7 +133,7 @@ class MessagesRepository:
 
         target_message.text_content = ""
         target_message.attachment_type = None
-        target_message.attached_image_keys = None
+        target_message.attached_images_count = None
         target_message.attached_post_id = None
         target_message.forwarded_from_user_id = None
 

@@ -11,7 +11,7 @@ load_short_user_option = load_only(
     User.username,
     User.fullname,
     User.avatar_type,
-    User.avatar_key,
+    User.avatar_id,
     User.deleted_at,
     User.is_online,
     User.last_seen,

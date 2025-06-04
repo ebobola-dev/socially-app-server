@@ -10,6 +10,8 @@ from filetype import guess
 from PIL import Image as pImage
 from PIL import UnidentifiedImageError
 
+from models.image_sizes import ImageSizes
+
 
 class PillowValidatationResult(Enum):
     valid = 1
@@ -21,20 +23,6 @@ class VerifyImageError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
-
-
-class ImageSizes(Enum):
-    s_128 = 128
-    s_512 = 512
-    s_original = 3
-
-    @property
-    def str_view(self):
-        return {
-            ImageSizes.s_128: "128",
-            ImageSizes.s_512: "512",
-            ImageSizes.s_original: "original",
-        }[self]
 
 
 class ImageUtils:
@@ -84,7 +72,7 @@ class ImageUtils:
             raise VerifyImageError('Unable to convert by magick') from convert_error
 
     @staticmethod
-    def split_image(image_buffer: BytesIO) -> dict[ImageSizes, BytesIO]:
+    def split_image_sync(image_buffer: BytesIO) -> dict[ImageSizes, BytesIO]:
         original_image = pImage.open(image_buffer)
         original_image.load()
         result = {}

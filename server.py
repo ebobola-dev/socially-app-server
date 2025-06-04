@@ -177,7 +177,7 @@ async def main():
             web.post(Paths.Posts.Comments.CREATE, comments_controller.add),
             web.delete(Paths.Posts.Comments.DELETE, comments_controller.delete),
             #
-            # web.get(Paths.Media.AVATARS, media_controller.get_avatar_image),
+            #web.get(Paths.Media.AVATARS, media_controller.get_avatar_image),
             # web.get(Paths.Media.POSTS, media_controller.get_post_image),
             # web.get(Paths.Media.MESSAGES, media_controller.get_message_image),
             web.get(Paths.Media.UNIVERSAL, media_controller.get),

@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from logging import Logger
 
@@ -238,15 +239,11 @@ class MessagesController:
 
         # ********************* End check attached records exist *********************#
 
-        attached_image_keys: list[str] = (
-            list(map(lambda img_data: img_data["file_key"], images)) if images else None
-        )
-
         # ************************** Attachment validation ************************** #
 
         attachment_type = Message.validate_attachments(
             text_content=text_content,
-            attached_image_keys=attached_image_keys,
+            images_attached=bool(images),
             attached_message_id=attached_message_id,
             attached_post_id=attached_post_id,
         )
@@ -279,13 +276,11 @@ class MessagesController:
             new_messages.append(cloned_message)
 
             # % Copying attached message images if they exist
-            if attached_message.attached_image_keys:
-                for image_key in attached_message.attached_image_keys:
-                    await MinioService.copy(
-                        source_bucket=Buckets.messages,
-                        source_key=f"{attached_message.id}/{image_key}",
-                        new_key=f"{cloned_message.id}/{image_key}",
-                    )
+            if attached_message.attached_images_count:
+                await MinioService.copy_message_images(
+                    source_msg_id=attached_message.id,
+                    to_msg_id=cloned_message.id,
+                )
         else:
             # % Usual message, without forwarding
             new_message = await MessagesRepository.create_message(
@@ -295,7 +290,7 @@ class MessagesController:
                     recipient_id=target_uid,
                     text_content=text_content,
                     attachment_type=attachment_type,
-                    attached_image_keys=attached_image_keys,
+                    attached_images_count=len(images) or None,
                     attached_post_id=attached_post_id,
                 ),
             )
@@ -303,11 +298,16 @@ class MessagesController:
 
             # % Saving attached images
             for image in images:
-                await MinioService.save(
-                    bucket=Buckets.messages,
-                    key=f"{new_message.id}/{image['file_key']}",
-                    bytes=image["content"],
+                splitted_images = await asyncio.to_thread(
+                    ImageUtils.split_image_sync,
+                    image_buffer=image["content"],
                 )
+                for size, buffer in splitted_images.items():
+                    await MinioService.save(
+                        bucket=Buckets.messages,
+                        key=f"{new_message.id}/{image['index']}/{size.str_view}{image['ext']}",
+                        bytes=buffer,
+                    )
 
         # ***************************** End devil logic ***************************** #
 
@@ -318,7 +318,7 @@ class MessagesController:
             self._logger.debug(f"Text content: {new_msg.text_content}")
             self._logger.debug(f"Attachemnt type: {new_msg.attachment_type}")
             self._logger.debug(f"Attached post id: {new_msg.attached_post_id}")
-            self._logger.debug(f"Attached images: {new_msg.attached_image_keys}")
+            self._logger.debug(f"Attached images: {new_msg.attached_images_count}")
             if new_msg.forwarded_from_user_id:
                 self._logger.debug(
                     f"Forwarded from user: @{new_msg.forwarded_from_user.username}"
@@ -372,11 +372,7 @@ class MessagesController:
         if target_message.sender_id != request.user_id:
             raise ForbiddenToDeleteMessageError()
 
-        image_keys = (
-            target_message.attached_image_keys.copy()
-            if target_message.attached_image_keys
-            else []
-        )
+        was_images = bool(target_message.attached_images_count)
         (
             deleted_message,
             previous_message,
@@ -384,10 +380,10 @@ class MessagesController:
             session=request.db_session,
             target_message_id=message_id,
         )
-        for image_key in image_keys:
-            await MinioService.delete(
+        if was_images:
+            await MinioService.delete_all_by_prefix(
                 bucket=Buckets.messages,
-                key=f"{message_id}/{image_key}",
+                prefix=message_id,
             )
 
         json_deleted_message = deleted_message.to_json(

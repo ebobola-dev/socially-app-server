@@ -4,11 +4,11 @@ from uuid import uuid4
 
 from sqlalchemy import (
     CHAR,
-    JSON,
     Boolean,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
 )
 from sqlalchemy import (
@@ -76,7 +76,7 @@ class Message(BaseModel):
         DateTime(timezone=True), nullable=True
     )
 
-    attached_image_keys: Mapped[list[str]] = mapped_column(JSON, nullable=True)
+    attached_images_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     forwarded_from_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -113,7 +113,7 @@ class Message(BaseModel):
         recipient_id: str,
         text_content: str = "",
         attachment_type: MessageAType | None = None,
-        attached_image_keys: list[str] | None = None,
+        attached_images_count: int | None = None,
         forwarded_from_user_id: str | None = None,
         attached_post_id: str | None = None,
     ) -> "Message":
@@ -122,7 +122,7 @@ class Message(BaseModel):
             recipient_id=recipient_id,
             text_content=text_content,
             attachment_type=attachment_type,
-            attached_image_keys=attached_image_keys,
+            attached_images_count=attached_images_count,
             forwarded_from_user_id=forwarded_from_user_id,
             attached_post_id=attached_post_id,
         )
@@ -138,19 +138,19 @@ class Message(BaseModel):
             text_content=self.text_content,
             attachment_type=self.attachment_type,
             attached_post_id=self.attached_post_id,
-            attached_image_keys=self.attached_image_keys,
+            attached_images_count=self.attached_images_count,
             forwarded_from_user_id=self.forwarded_from_user_id or self.sender_id,
         )
 
     @staticmethod
     def validate_attachments(
         text_content: str | None,
-        attached_image_keys: list[str] | None,
+        images_attached: bool,
         attached_post_id: str | None,
         attached_message_id: str | None,
     ) -> MessageAType | None:
         attachment_kinds = (
-            bool(attached_image_keys),
+            images_attached,
             bool(attached_post_id),
             bool(attached_message_id),
         )
@@ -164,7 +164,7 @@ class Message(BaseModel):
                 raise InvalidMessageAttachmentError(
                     "Message must have text or one attachment"
                 )
-        if attached_image_keys:
+        if images_attached:
             return MessageAType.images
         if attached_post_id:
             return MessageAType.post
@@ -197,13 +197,6 @@ class Message(BaseModel):
                 short=short,
                 detect_rels_for_user_id=detect_rels_for_user_id,
             )
-            if short:
-                json_view["attached_images_count"] = len(self.attached_post.image_keys)
-
-        # % attached images
-        if short and self.attached_image_keys:
-            json_view["first_image_key"] = self.attached_image_keys[0]
-            json_view["attached_images_count"] = len(self.attached_image_keys)
 
         # % forwaded message
         json_view["is_forwarded"] = self.is_forwarded

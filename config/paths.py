@@ -66,7 +66,7 @@ class Paths:
         _base_path = f'{_base_api_path}/media'
         UNIVERSAL = f'{_base_path}/{{category}}/{{key}}'
         WITH_FOLDER = f'{_base_path}/{{category}}/{{folder}}/{{key}}'
-        AVATARS = f'{_base_path}/avatars/{{avatar_key}}'
+        AVATARS = f'{_base_path}/avatars/{{avatar_id}}'
         POSTS = f'{_base_path}/posts/{{post_id}}'
         MESSAGES = f'{_base_path}/messages/{{message_id}}'
 

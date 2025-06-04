@@ -12,3 +12,4 @@ pyproject.toml
 dev.py
 Dockerfile.dev
 docker-compose.override.yml
+minio_cleaner.py

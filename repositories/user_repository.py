@@ -323,7 +323,7 @@ class UserRepository:
         session: AsyncSession,
         user_id: str,
         new_avatar_type: AvatarType,
-        new_avatar_key: str | None = None,
+        new_avatar_id: str | None = None,
     ) -> User:
         user: User = await UserRepository.get_by_id_with_relations(
             session=session, user_id=user_id
@@ -331,7 +331,7 @@ class UserRepository:
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = new_avatar_type
-        user.avatar_key = new_avatar_key
+        user.avatar_id = new_avatar_id
         try:
             await session.flush()
             await session.refresh(user)
@@ -348,7 +348,7 @@ class UserRepository:
         if not user:
             raise UserNotFoundError(user_id)
         user.avatar_type = None
-        user.avatar_key = None
+        user.avatar_id = None
         try:
             await session.flush()
             await session.refresh(user)
@@ -519,7 +519,7 @@ class UserRepository:
         target_user.gender = None
         target_user.about_me = ""
         target_user.avatar_type = None
-        target_user.avatar_key = None
+        target_user.avatar_id = None
         target_user.is_online = False
         target_user.current_sid = None
         target_user.last_seen = None

@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from logging import Logger
 
@@ -154,17 +155,22 @@ class PostsController:
         new_post = Post.new(
             author_id=request.user_id,
             text_content=text_content,
-            image_keys=list(map(lambda img_data: img_data["file_key"], images)),
+            images_count=len(images),
         )
         await PostRepository.add(session=request.db_session, new_post=new_post)
         self._logger.debug(f"New post: {new_post}")
 
         for image in images:
-            await MinioService.save(
-                bucket=Buckets.posts,
-                key=f"{new_post.id}/{image['file_key']}",
-                bytes=image["content"],
+            splitted_images = await asyncio.to_thread(
+                ImageUtils.split_image_sync,
+                image_buffer=image["content"],
             )
+            for size, buffer in splitted_images.items():
+                await MinioService.save(
+                    bucket=Buckets.posts,
+                    key=f"{new_post.id}/{image['index']}/{size.str_view}{image['ext']}",
+                    bytes=buffer,
+                )
 
         return json_response(new_post.to_json(detect_rels_for_user_id=request.user_id))
 
@@ -181,15 +187,13 @@ class PostsController:
             raise PostNotFoundError(post_id)
         if post.author_id != request.user_id and not request.user_role.is_owner:
             raise ForbiddenError(global_errors=["You can't delete someone else's post"])
-        image_keys = post.image_keys.copy()
         deleted_post = await PostRepository.soft_delete(
             session=request.db_session, target_post_id=post_id
         )
-        for image_key in image_keys:
-            await MinioService.delete(
-                bucket=Buckets.posts,
-                key=f"{post.id}/{image_key}",
-            )
+        await MinioService.delete_all_by_prefix(
+            bucket=Buckets.posts,
+            prefix=post.id,
+        )
         await self._sio.emit_post_deleted(post_id=post_id)
         return json_response(
             data=deleted_post.to_json(detect_rels_for_user_id=request.user_id)
