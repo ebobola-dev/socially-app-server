@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     "id",
     "username",
     "fullname",
-    "avatar_key",
+    "avatar_id",
     "avatar_type",
     "is_online",
     "deleted_at",
@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     "is_online",
     "current_sid",
     "last_seen",
-    "avatar_key",
+    "avatar_id",
 )
 class User(BaseModel):
     __tablename__ = "users"
