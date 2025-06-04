@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from models.user import User
 
 
-@short_fields("id", "created_at", "deleted_at")
+@short_fields("id", "created_at", "deleted_at", "images_count")
 class Post(BaseModel):
     __tablename__ = "posts"
 
