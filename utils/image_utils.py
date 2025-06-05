@@ -8,7 +8,7 @@ from secrets import token_hex as random_string
 
 from filetype import guess
 from PIL import Image as pImage
-from PIL import UnidentifiedImageError
+from PIL import ImageOps, UnidentifiedImageError
 
 from models.image_sizes import ImageSizes
 
@@ -74,6 +74,7 @@ class ImageUtils:
     @staticmethod
     def split_image_sync(image_buffer: BytesIO) -> dict[ImageSizes, BytesIO]:
         original_image = pImage.open(image_buffer)
+        original_image = ImageOps.exif_transpose(original_image)
         original_image.load()
         result = {}
         image_buffer.seek(0)
