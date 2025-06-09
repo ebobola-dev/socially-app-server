@@ -134,6 +134,14 @@ class User(BaseModel):
         passive_deletes=True,
     )
 
+    fcm_tokens = relationship(
+        "FCMToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="dynamic",
+    )
+
     @staticmethod
     def new(email, role: Role = Role.user):
         return User(

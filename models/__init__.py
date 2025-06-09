@@ -3,6 +3,7 @@ from .message_attachment_type import MessageAType
 from .pagination import Pagination
 from .role import Role
 from .version_type import VersionType
+from .fcm_token import FCMToken
 
 from .base import BaseModel
 from .apk_update import ApkUpdate
