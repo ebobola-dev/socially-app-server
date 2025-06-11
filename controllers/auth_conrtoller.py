@@ -19,6 +19,7 @@ from models.exceptions.api_exceptions import (
     ValidationError,
 )
 from models.otp import OtpDestiny
+from repositories.fcm_token_repository import FCMTokenRepository
 from repositories.otp_repository import OtpRepository
 from repositories.user_repository import UserRepository
 from services.email_service import EmailService
@@ -36,12 +37,14 @@ class AuthConrtoller:
     @validate_request_body(
         ValidateField.username(),
         ValidateField.password(),
+        ValidateField.fcm_token(),
     )
     async def login(self, request: Request) -> Response:
         body = request["validated_body"]
 
         username = body.get("username")
         password = body.get("password")
+        fcm_token = body.get("fcm_token")
 
         user = await UserRepository.get_by_username(request.db_session, username)
         if user is None:
@@ -64,7 +67,16 @@ class AuthConrtoller:
             user_role=user.role,
         )
 
-        self._logger.debug(f"@{username} successful logged in!")
+        if fcm_token:
+            await FCMTokenRepository.create_or_update(
+                session=request.db_session,
+                user_id=user.id,
+                device_id=request.device_id,
+                new_value=fcm_token,
+            )
+            self._logger.debug("FCM token is saved")
+
+        self._logger.debug(f"@{username} logged in")
 
         return json_response(
             {
@@ -141,6 +153,13 @@ class AuthConrtoller:
             user_id=user.id,
             device_id=request.device_id,
         )
+        deleted_fcm_tokens_count = await FCMTokenRepository.delete_by_user(
+            session=request.db_session,
+            user_id=user.id,
+            device_id=request.device_id,
+        )
+        if deleted_fcm_tokens_count:
+            self._logger.debug("FCM token was deleted")
         await request.db_session.commit()
         self._logger.debug(f"@{user.username} has logged out")
         raise UnauthorizedError()
@@ -205,6 +224,7 @@ class AuthConrtoller:
     @device_id_specified()
     @validate_request_body(
         ValidateField.otp_code(),
+        ValidateField.fcm_token(),
     )
     async def verify_otp_for_reset_password(self, request: Request) -> Response:
         #! Need a type:
@@ -240,6 +260,7 @@ class AuthConrtoller:
 
         body = request["validated_body"]
         otp_code = body.get("otp_code")
+        fcm_token = body.get("fcm_token")
 
         await OtpRepository.verify(request.db_session, user.email_address, otp_code)
 
@@ -254,6 +275,15 @@ class AuthConrtoller:
             device_id=request.device_id,
             user_role=user.role,
         )
+
+        if fcm_token:
+            await FCMTokenRepository.create_or_update(
+                session=request.db_session,
+                user_id=user.id,
+                device_id=request.device_id,
+                new_value=fcm_token,
+            )
+            self._logger.debug("FCM token is saved")
 
         return json_response(
             {

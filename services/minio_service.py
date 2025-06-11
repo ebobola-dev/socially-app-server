@@ -1,5 +1,6 @@
 import asyncio
 import mimetypes
+from datetime import timedelta
 from enum import Enum
 from io import BytesIO
 
@@ -318,7 +319,7 @@ class MinioService:
                     await asyncio.to_thread(
                         MinioService.instance.list_objects,
                         bucket_name=bucket.value,
-                        prefix=f'{prefix}/{size.str_view}',
+                        prefix=f"{prefix}/{size.str_view}",
                     )
                 )
                 if objects:
@@ -326,4 +327,23 @@ class MinioService:
             except S3Error as e:
                 if e.code != "NoSuchKey":
                     raise MinioError(error=e) from e
-        raise MinioNotFoundError(key=f'{prefix=}, {requested_size=}')
+        raise MinioNotFoundError(key=f"{prefix=}, {requested_size=}")
+
+    @staticmethod
+    async def generate_temp_link(
+        bucket: Buckets, key: str, expires=timedelta(minutes=5)
+    ) -> str:
+        if not MinioService.INITALIZED:
+            raise ServiceNotInitalizedButUsingError("MinioService")
+        try:
+            return await asyncio.to_thread(
+                MinioService.instance.presigned_get_object,
+                bucket_name=bucket.value,
+                object_name=key,
+                expires=expires,
+            )
+        except S3Error as error:
+            if error.code == "NoSuchKey":
+                raise MinioNotFoundError(key=key)
+            else:
+                raise MinioError(error=error) from error

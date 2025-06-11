@@ -21,7 +21,7 @@ class _MYFormatter(colorlog.ColoredFormatter):
 
 class MyLoggerConfig:
     INITALIZED: bool = False
-    LEVEL: str
+    LEVEL: str = 1
     COLOR_HANDLER: colorlog.StreamHandler
 
     @staticmethod

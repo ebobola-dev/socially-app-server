@@ -20,6 +20,7 @@ from models.exceptions.api_exceptions import (
 from models.gender import Gender
 from models.otp import OtpDestiny
 from models.role import Role
+from repositories.fcm_token_repository import FCMTokenRepository
 from repositories.otp_repository import OtpRepository
 from repositories.user_repository import UserRepository
 from services.email_service import EmailService
@@ -140,6 +141,7 @@ class RegistrationController:
         ValidateField.about_me(),
         ValidateField.username(),
         ValidateField.password(),
+        ValidateField.fcm_token(),
     )
     async def complete_registration(self, request: Request):
         body: dict = request["validated_body"]
@@ -150,6 +152,7 @@ class RegistrationController:
         about_me = body.get("about_me")
         username = body.get("username")
         password = body.get("password")
+        fcm_token = body.get("fcm_token")
 
         date_of_birth = date.fromisoformat(date_of_birth)
 
@@ -163,7 +166,9 @@ class RegistrationController:
         # * Find the user by id
         user_id = request.user_id
 
-        user = await UserRepository.get_by_id_with_relations(request.db_session, user_id)
+        user = await UserRepository.get_by_id_with_relations(
+            request.db_session, user_id
+        )
         if user is None:
             raise UserNotFoundError(user_id)
         if user is not None and user.is_registration_completed:
@@ -187,5 +192,17 @@ class RegistrationController:
             username=username,
             password=password,
         )
+        if fcm_token:
+            await FCMTokenRepository.create_or_update(
+                session=request.db_session,
+                user_id=user.id,
+                device_id=request.device_id,
+                new_value=fcm_token,
+            )
+            self._logger.debug("FCM token is saved")
         self._logger.debug(f"{user.email_address} completed the registration")
-        return json_response(data=updated_user.to_json(safe=True, detect_rels_for_user_id=updated_user.id))
+        return json_response(
+            data=updated_user.to_json(
+                safe=True, detect_rels_for_user_id=updated_user.id
+            )
+        )

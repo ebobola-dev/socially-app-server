@@ -15,9 +15,10 @@ jobs:
           with:
             clean: false
 
-        - name: Copy env file
-          run: cp ~/envs/socially_app.env .env
-
+        - name: Copy configuration files
+          run: |
+               cp ~/envs/socially_app.env .env
+               cp ~/envs/socially_app_firebase_admin_cred.json config/firebase-admin-cred.json
         - name: Docker Compose build
           run: docker compose build
 

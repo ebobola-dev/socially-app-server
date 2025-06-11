@@ -34,6 +34,7 @@ class Paths:
         GET_FOLLOWINGS = f"{_base_path}/followings"
         GET_FOLLOWERS = f"{_base_path}/followers"
         UPDATE_ROLE = f"{_base_path}/update_role"
+        FCM_TOKENS = f'{_base_path}/fcm_tokens'
 
     class TestUsers:
         _base_path = f"{_base_api_path}/test_users"

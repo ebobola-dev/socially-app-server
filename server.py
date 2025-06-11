@@ -41,6 +41,8 @@ async def initialize():
     await MinioService.initialize()
     await Database.initialize()
 
+    from services.fcm_service import FCMService
+    FCMService.initialize()
 
 async def main():
     await initialize()
@@ -154,6 +156,7 @@ async def main():
             web.get(Paths.Users.GET_FOLLOWERS, users_controller.get_followers),
             web.put(Paths.Users.UPDATE_ROLE, users_controller.update_role),
             web.delete(Paths.Users.DELETE, users_controller.soft_delete),
+            web.put(Paths.Users.FCM_TOKENS, users_controller.update_fcm_token),
             #
             web.get(
                 Paths.TestUsers.ADMIN_ROLE_TEST, test_users_controller.test_admin_role

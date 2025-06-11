@@ -33,3 +33,4 @@ aiofiles==24.1.0
 packaging==24.2
 minio==7.2.15
 redis==6.1.0
+firebase-admin==6.9.0

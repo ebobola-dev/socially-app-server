@@ -14,6 +14,7 @@ from controllers.middlewares import (
     authenticate,
     content_type_is_json,
     content_type_is_multipart,
+    device_id_specified,
     owner_role,
 )
 from controllers.sio_controller import SioController
@@ -32,6 +33,7 @@ from models.exceptions.api_exceptions import (
 from models.gender import Gender
 from models.pagination import Pagination
 from models.role import Role
+from repositories.fcm_token_repository import FCMTokenRepository
 from repositories.user_repository import UserRepository
 from services.minio_service import Buckets, MinioService
 from services.tokens_service import TokensService
@@ -507,6 +509,10 @@ class UsersController:
             await TokensService.delete_all_by_user_id(
                 session=request.db_session, user_id=user.id
             )
+            await FCMTokenRepository.delete_by_user(
+                session=request.db_session,
+                user_id=user.id,
+            )
             await request.db_session.commit()
         except Exception as _:
             await request.db_session.rollback()
@@ -514,6 +520,26 @@ class UsersController:
         await self._sio.on_user_deleted(user_sid)
         self._logger.warning(f"User (@{user.username}) has been deleted (by himself)\n")
         raise UnauthorizedError()
+
+    @device_id_specified()
+    @content_type_is_json()
+    @authenticate()
+    @validate_request_body(
+        ValidateField.fcm_token(
+            required=True,
+            nullable=False,
+        )
+    )
+    async def update_fcm_token(self, request: Request):
+        body: dict = request["validated_body"]
+        new_fcm_token = body.get("fcm_token")
+        await FCMTokenRepository.create_or_update(
+            session=request.db_session,
+            user_id=request.user_id,
+            device_id=request.device_id,
+            new_value=new_fcm_token,
+        )
+        return json_response()
 
     @authenticate()
     @owner_role()

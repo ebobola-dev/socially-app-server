@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +30,7 @@ class FCMTokenRepository:
         token = result.first()
         if token:
             token.value = new_value
+            token.updated_at = datetime.now(timezone.utc)
         else:
             token = FCMToken(
                 user_id=user_id,
@@ -40,12 +43,19 @@ class FCMTokenRepository:
         return token
 
     @staticmethod
-    async def delete(
+    async def delete_by_user(
         session: AsyncSession, user_id: str, device_id: str | None = None
     ) -> int:
         query = delete(FCMToken).where(FCMToken.user_id == user_id)
         if device_id:
             query = query.where(FCMToken.device_id == device_id)
+        result = await session.execute(query)
+        await session.flush()
+        return result.rowcount
+
+    @staticmethod
+    async def delete_by_id(session: AsyncSession, token_id: str):
+        query = delete(FCMToken).where(FCMToken.id == token_id)
         result = await session.execute(query)
         await session.flush()
         return result.rowcount

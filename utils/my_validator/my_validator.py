@@ -190,6 +190,15 @@ class ValidateField:
             ],
         )
 
+    @staticmethod
+    def fcm_token(field_name: str = "fcm_token", required: bool = False, nullable=True):
+        return ValidateField(
+            field_name=field_name,
+            required=required,
+            nullable=nullable,
+            rules=[IsInstanceRule(str)],
+        )
+
 
 def validate(
     value: any,
