@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import CHAR, ForeignKey, String
+from sqlalchemy import CHAR, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import BaseModel
@@ -25,6 +26,18 @@ class FCMToken(BaseModel):
     )
 
     value: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     user = relationship("User", back_populates="fcm_tokens")
 
